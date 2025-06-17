@@ -1,13 +1,15 @@
 export default async function handler(req, res) {
-  // Uitgebreide CORS headers
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.filright.com');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'false');
-  res.setHeader('Access-Control-Max-Age', '86400');
+  // Breedere CORS voor debugging - later weer specifiek maken
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Debug logging
+  console.log('Affiliate API called:', req.method, req.headers.origin);
   
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('OPTIONS preflight for affiliate API');
     res.status(200).end();
     return;
   }
