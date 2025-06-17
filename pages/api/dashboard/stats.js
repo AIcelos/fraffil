@@ -1,5 +1,5 @@
 const googleSheetsService = require('../../../lib/googleSheets');
-const { getInfluencerProfile } = require('../../../lib/database');
+const { getInfluencer } = require('../../../lib/database');
 
 export default async function handler(req, res) {
   // CORS headers
@@ -75,7 +75,8 @@ export default async function handler(req, res) {
     // Get influencer profile from database (for commission rate)
     let influencerProfile = null;
     try {
-      influencerProfile = await getInfluencerProfile(influencer);
+      influencerProfile = await getInfluencer(influencer);
+      console.log('📋 Fetched influencer profile from database:', influencerProfile?.ref, 'commission:', influencerProfile?.commission);
     } catch (dbError) {
       console.log('⚠️  Could not fetch influencer profile from database:', dbError.message);
     }
