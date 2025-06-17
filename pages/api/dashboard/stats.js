@@ -71,6 +71,7 @@ export default async function handler(req, res) {
     }
 
     console.log('📊 Fetching real data from Google Sheets for:', influencer);
+    console.log('🔄 Dashboard stats API - latest version with database integration');
     
     // Get influencer profile from database (for commission rate)
     let influencerProfile = null;
