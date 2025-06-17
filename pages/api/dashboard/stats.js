@@ -75,10 +75,17 @@ export default async function handler(req, res) {
     // Get influencer profile from database (for commission rate)
     let influencerProfile = null;
     try {
+      console.log('🔍 Attempting to fetch influencer profile for:', influencer);
       influencerProfile = await getInfluencer(influencer);
-      console.log('📋 Fetched influencer profile from database:', influencerProfile?.ref, 'commission:', influencerProfile?.commission);
+      console.log('📋 Raw database result:', JSON.stringify(influencerProfile, null, 2));
+      if (influencerProfile) {
+        console.log('✅ Found profile - ref:', influencerProfile.ref, 'commission:', influencerProfile.commission);
+      } else {
+        console.log('❌ No profile found in database for:', influencer);
+      }
     } catch (dbError) {
-      console.log('⚠️  Could not fetch influencer profile from database:', dbError.message);
+      console.log('⚠️  Database error for influencer:', influencer, 'Error:', dbError.message);
+      console.log('📋 Full error:', dbError);
     }
 
     // Get real data from Google Sheets
