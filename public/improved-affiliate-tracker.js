@@ -22,6 +22,39 @@
     var urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(param);
   }
+
+  // Extract order amount from thank you page
+  function getOrderAmount() {
+    var amount = null;
+    
+    // Try different methods to extract order amount
+    // Method 1: Look for euro amounts in the page
+    var bodyText = document.body.innerText || document.body.textContent;
+    var euroMatches = bodyText.match(/€\s*(\d+[.,]\d{2})/g);
+    
+    if (euroMatches && euroMatches.length > 0) {
+      // Get the largest amount (likely the order total)
+      var amounts = euroMatches.map(function(match) {
+        return parseFloat(match.replace('€', '').replace(',', '.').trim());
+      });
+      amount = Math.max.apply(Math, amounts);
+    }
+    
+    // Method 2: Look for specific order total elements
+    var totalElements = document.querySelectorAll('[class*="total"], [class*="amount"], [id*="total"]');
+    totalElements.forEach(function(el) {
+      var text = el.innerText || el.textContent;
+      var match = text.match(/€\s*(\d+[.,]\d{2})/);
+      if (match) {
+        var foundAmount = parseFloat(match[1].replace(',', '.'));
+        if (foundAmount > (amount || 0)) {
+          amount = foundAmount;
+        }
+      }
+    });
+    
+    return amount;
+  }
   
   // Save ref parameter to cookie
   var ref = getQueryParam('ref');
@@ -33,8 +66,10 @@
   // Track affiliate on thank you page (with duplicate protection)
   if (window.location.pathname.indexOf('/checkout/thankyou') !== -1) {
     var orderId = null;
-    var paragraphs = document.querySelectorAll('p');
+    var orderAmount = null;
     
+    // Extract order ID
+    var paragraphs = document.querySelectorAll('p');
     paragraphs.forEach(function(p) {
       if (p.textContent.includes('Je bestelling met ordernummer')) {
         var strong = p.querySelector('strong');
@@ -43,6 +78,9 @@
         }
       }
     });
+    
+    // Extract order amount
+    orderAmount = getOrderAmount();
     
     var savedRef = getCookie('affiliate_ref');
     if (savedRef && orderId) {
@@ -56,12 +94,22 @@
         return;
       }
       
-      console.log('🚀 Affiliate tracking starten:', savedRef, orderId);
+      console.log('🚀 Affiliate tracking starten:', { ref: savedRef, orderId: orderId, amount: orderAmount });
+      
+      var payload = { 
+        ref: savedRef, 
+        orderId: orderId
+      };
+      
+      // Add amount if found
+      if (orderAmount) {
+        payload.amount = orderAmount;
+      }
       
       fetch('https://fraffil.vercel.app/api/affiliate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: savedRef, orderId: orderId })
+        body: JSON.stringify(payload)
       }).then(function(response) {
         return response.json();
       }).then(function(data) {
@@ -71,6 +119,7 @@
         localStorage.setItem(trackedKey, JSON.stringify({
           ref: savedRef,
           orderId: orderId,
+          amount: orderAmount,
           timestamp: new Date().toISOString()
         }));
         

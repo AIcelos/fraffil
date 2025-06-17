@@ -18,10 +18,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { ref, orderId } = req.body;
+  const { ref, orderId, amount } = req.body;
 
   // Debug logging
-  console.log('📋 Received data:', { ref, orderId });
+  console.log('📋 Received data:', { ref, orderId, amount });
 
   if (!ref || !orderId) {
     console.log('❌ Missing data - ref:', ref, 'orderId:', orderId);
@@ -50,6 +50,12 @@ export default async function handler(req, res) {
     timestamp: new Date().toISOString(),
     source: 'fraffil-api'
   };
+
+  // Add amount if provided
+  if (amount && typeof amount === 'number' && amount > 0) {
+    payload.Amount = amount;
+    payload.AmountFormatted = `€${amount.toFixed(2)}`;
+  }
   
   console.log('🚀 Sending to Zapier:', payload);
 
