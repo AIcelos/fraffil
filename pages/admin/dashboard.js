@@ -210,7 +210,7 @@ export default function AdminDashboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {influencers.map((influencer, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
+                  <tr key={index} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/admin/influencer/${influencer.name}`)}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
@@ -245,8 +245,24 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-blue-600 hover:text-blue-900 mr-3">View</button>
-                      <button className="text-gray-600 hover:text-gray-900">Edit</button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/admin/influencer/${influencer.name}`);
+                        }}
+                        className="text-blue-600 hover:text-blue-900 mr-3"
+                      >
+                        View
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/admin/influencer/${influencer.name}`);
+                        }}
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        Edit
+                      </button>
                     </td>
                   </tr>
                 ))}
