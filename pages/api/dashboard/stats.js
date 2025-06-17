@@ -1,4 +1,5 @@
 const googleSheetsService = require('../../../lib/googleSheets');
+const { getInfluencerProfile } = require('../../../lib/database');
 
 export default async function handler(req, res) {
   // CORS headers
@@ -29,12 +30,25 @@ export default async function handler(req, res) {
       console.log('⚠️  Google Sheets not configured, using mock data');
       
       // Return mock data as fallback
+      const mockRevenue = 2340.50;
+      const mockCommissionRate = 5;
       const mockStats = {
         influencer: influencer,
         totalSales: 15,
-        totalRevenue: 2340.50,
+        totalRevenue: mockRevenue,
         conversionRate: 3.2,
         lastSale: '2025-06-17',
+        commission: {
+          rate: mockCommissionRate,
+          total: (mockRevenue * mockCommissionRate) / 100,
+          avgPerOrder: ((mockRevenue * mockCommissionRate) / 100) / 15,
+          thisMonth: 0
+        },
+        orderMetrics: {
+          avgOrderValue: mockRevenue / 15,
+          totalOrders: 15,
+          totalRevenue: mockRevenue
+        },
         recentOrders: [
           { date: '2025-06-17', orderId: 'ORD08055', amount: 149.95 },
           { date: '2025-06-16', orderId: 'ORD08043', amount: 89.99 },
@@ -44,7 +58,8 @@ export default async function handler(req, res) {
           'January': { sales: 3, revenue: 450.00 },
           'February': { sales: 5, revenue: 780.50 },
           'March': { sales: 7, revenue: 1110.00 }
-        }
+        },
+        profile: null
       };
 
       return res.status(200).json({
@@ -57,6 +72,14 @@ export default async function handler(req, res) {
 
     console.log('📊 Fetching real data from Google Sheets for:', influencer);
     
+    // Get influencer profile from database (for commission rate)
+    let influencerProfile = null;
+    try {
+      influencerProfile = await getInfluencerProfile(influencer);
+    } catch (dbError) {
+      console.log('⚠️  Could not fetch influencer profile from database:', dbError.message);
+    }
+
     // Get real data from Google Sheets
     const stats = await googleSheetsService.getInfluencerStats(influencer);
     
@@ -64,12 +87,40 @@ export default async function handler(req, res) {
       throw new Error('Failed to fetch Google Sheets data');
     }
 
-    console.log('✅ Successfully retrieved stats for:', influencer);
+    // Calculate commission information
+    const commissionRate = influencerProfile?.commission || 5; // Default 5%
+    const totalRevenue = parseFloat(stats.totalRevenue) || 0;
+    const totalCommission = (totalRevenue * commissionRate) / 100;
+    const avgOrderValue = stats.totalSales > 0 ? totalRevenue / stats.totalSales : 0;
+    const avgCommissionPerOrder = stats.totalSales > 0 ? totalCommission / stats.totalSales : 0;
+
+    // Add commission data to stats
+    const enrichedStats = {
+      ...stats,
+      commission: {
+        rate: commissionRate,
+        total: totalCommission,
+        avgPerOrder: avgCommissionPerOrder,
+        thisMonth: 0 // TODO: Calculate current month commission
+      },
+      orderMetrics: {
+        avgOrderValue: avgOrderValue,
+        totalOrders: stats.totalSales,
+        totalRevenue: totalRevenue
+      },
+      profile: influencerProfile ? {
+        name: influencerProfile.name,
+        email: influencerProfile.email,
+        phone: influencerProfile.phone
+      } : null
+    };
+
+    console.log('✅ Successfully retrieved enriched stats for:', influencer);
     
     return res.status(200).json({
       success: true,
-      data: stats,
-      source: 'google_sheets',
+      data: enrichedStats,
+      source: 'google_sheets_with_db',
       generated: new Date().toISOString()
     });
 
@@ -83,8 +134,20 @@ export default async function handler(req, res) {
       totalRevenue: 0.00,
       conversionRate: 0.0,
       lastSale: null,
+      commission: {
+        rate: 5,
+        total: 0,
+        avgPerOrder: 0,
+        thisMonth: 0
+      },
+      orderMetrics: {
+        avgOrderValue: 0,
+        totalOrders: 0,
+        totalRevenue: 0
+      },
       recentOrders: [],
       monthlyStats: {},
+      profile: null,
       error: 'Could not connect to Google Sheets'
     };
 

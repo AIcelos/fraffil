@@ -130,6 +130,26 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* Commission Highlight */}
+          {stats?.commission && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Jouw Commissie</h2>
+                    <p className="text-green-100">Dit heb je verdiend met je affiliate links</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-4xl font-bold">€{stats.commission.total.toFixed(2)}</p>
+                    <p className="text-green-100">
+                      {stats.commission.rate}% commissie op €{stats.totalRevenue?.toFixed(2)} omzet
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -137,13 +157,16 @@ const Dashboard = () => {
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <div className="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
-                      <span className="text-green-600 text-sm font-bold">€</span>
+                      <span className="text-green-600 text-sm font-bold">💰</span>
                     </div>
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Totale Omzet</p>
+                    <p className="text-sm font-medium text-gray-500">Totale Commissie</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      €{stats.totalRevenue?.toFixed(2)}
+                      €{stats.commission?.total?.toFixed(2) || '0.00'}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {stats.commission?.rate || 5}% van omzet
                     </p>
                   </div>
                 </div>
@@ -159,6 +182,9 @@ const Dashboard = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500">Totale Verkopen</p>
                     <p className="text-2xl font-semibold text-gray-900">{stats.totalSales}</p>
+                    <p className="text-xs text-gray-400">
+                      Ø €{stats.commission?.avgPerOrder?.toFixed(2) || '0.00'} per order
+                    </p>
                   </div>
                 </div>
               </div>
@@ -167,12 +193,17 @@ const Dashboard = () => {
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                      <span className="text-purple-600 text-sm font-bold">%</span>
+                      <span className="text-purple-600 text-sm font-bold">€</span>
                     </div>
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Conversie Rate</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.conversionRate}%</p>
+                    <p className="text-sm font-medium text-gray-500">Totale Omzet</p>
+                    <p className="text-2xl font-semibold text-gray-900">
+                      €{stats.totalRevenue?.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Ø €{stats.orderMetrics?.avgOrderValue?.toFixed(2) || '0.00'} per order
+                    </p>
                   </div>
                 </div>
               </div>
@@ -186,8 +217,49 @@ const Dashboard = () => {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500">Laatste Verkoop</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.lastSale}</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.lastSale || 'Geen'}</p>
+                    <p className="text-xs text-gray-400">
+                      {stats.conversionRate}% conversie rate
+                    </p>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Commission Details */}
+          {stats?.commission && (
+            <div className="bg-white rounded-lg shadow mb-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Commissie Details</h2>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Jouw Commissie Percentage</p>
+                    <p className="text-3xl font-bold text-green-600">{stats.commission.rate}%</p>
+                    <p className="text-xs text-gray-400 mt-1">Van elke verkoop</p>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Gemiddelde Commissie per Order</p>
+                    <p className="text-3xl font-bold text-blue-600">€{stats.commission.avgPerOrder.toFixed(2)}</p>
+                    <p className="text-xs text-gray-400 mt-1">Per verkoop</p>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Totaal Verdiend</p>
+                    <p className="text-3xl font-bold text-purple-600">€{stats.commission.total.toFixed(2)}</p>
+                    <p className="text-xs text-gray-400 mt-1">Alle tijd</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">💡 Hoe werkt het?</h3>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Je krijgt <strong>{stats.commission.rate}%</strong> commissie op elke verkoop via jouw link</li>
+                    <li>• Bij een verkoop van €100 verdien je €{(100 * stats.commission.rate / 100).toFixed(2)}</li>
+                    <li>• Je gemiddelde order waarde is €{stats.orderMetrics?.avgOrderValue?.toFixed(2)}</li>
+                    <li>• Commissies worden maandelijks uitbetaald</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -198,6 +270,7 @@ const Dashboard = () => {
             <div className="bg-white rounded-lg shadow mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">Recente Bestellingen</h2>
+                <p className="text-sm text-gray-500">Je laatste verkopen en verdiende commissies</p>
               </div>
               <div className="p-6">
                 <div className="overflow-x-auto">
@@ -211,27 +284,43 @@ const Dashboard = () => {
                           Order ID
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Bedrag
+                          Omzet
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Jouw Commissie
                         </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {stats.recentOrders.map((order, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {order.date}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                            {order.orderId}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            €{order.amount?.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                      {stats.recentOrders.map((order, index) => {
+                        const orderCommission = (order.amount * (stats.commission?.rate || 5)) / 100;
+                        return (
+                          <tr key={index}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {order.date}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                              {order.orderId}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              €{order.amount?.toFixed(2)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
+                              €{orderCommission?.toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+                
+                {stats.recentOrders.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Nog geen bestellingen via jouw affiliate link</p>
+                    <p className="text-sm text-gray-400 mt-1">Deel je link om te beginnen met verdienen!</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
