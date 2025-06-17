@@ -7,21 +7,30 @@ export default function AdminDashboard() {
   const [influencers, setInfluencers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    // Check admin authentication
-    const token = localStorage.getItem('admin_token');
-    const user = localStorage.getItem('admin_user');
-    
-    if (!token || !user) {
-      router.push('/admin/login');
-      return;
-    }
+    // Check admin authentication - only client-side
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('adminToken');
+      const user = localStorage.getItem('adminUser');
+      
+      if (!token || !user) {
+        router.push('/admin/login');
+        return;
+      }
 
-    setAdminUser(JSON.parse(user));
-    loadDashboardData();
-  }, []);
+      setAdminUser(JSON.parse(user));
+      setIsAuthenticated(true);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadDashboardData();
+    }
+  }, [isAuthenticated]);
 
   const loadDashboardData = async () => {
     try {
@@ -46,8 +55,8 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
     router.push('/admin/login');
   };
 
@@ -58,12 +67,14 @@ export default function AdminDashboard() {
     }).format(amount);
   };
 
-  if (isLoading) {
+  if (!isAuthenticated || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading admin dashboard...</p>
+          <p className="mt-4 text-gray-600">
+            {!isAuthenticated ? 'Authenticatie controleren...' : 'Admin dashboard laden...'}
+          </p>
         </div>
       </div>
     );

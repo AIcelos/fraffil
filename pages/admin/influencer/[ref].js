@@ -10,19 +10,22 @@ export default function InfluencerDetail() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({});
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (!ref) return;
-    
-    // Check admin authentication
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      router.push('/admin/login');
-      return;
+    // Check admin authentication - only client-side
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        router.push('/admin/login');
+        return;
+      }
+      setIsAuthenticated(true);
     }
 
+    if (!ref || !isAuthenticated) return;
     fetchInfluencerData();
-  }, [ref]);
+  }, [ref, router, isAuthenticated]);
 
   const fetchInfluencerData = async () => {
     try {
@@ -100,12 +103,14 @@ export default function InfluencerDetail() {
     router.push('/admin/login');
   };
 
-  if (loading) {
+  if (!isAuthenticated || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Influencer gegevens laden...</p>
+          <p className="mt-4 text-gray-600">
+            {!isAuthenticated ? 'Authenticatie controleren...' : 'Influencer gegevens laden...'}
+          </p>
         </div>
       </div>
     );
