@@ -20,25 +20,45 @@ export default async function handler(req, res) {
 
   const { ref, orderId } = req.body;
 
+  // Debug logging
+  console.log('📋 Received data:', { ref, orderId });
+
   if (!ref || !orderId) {
+    console.log('❌ Missing data - ref:', ref, 'orderId:', orderId);
     return res.status(400).json({ error: 'Missing ref or orderId' });
   }
 
   // Vervang hieronder door jouw echte Zapier webhook URL!
   const zapierWebhookUrl = 'https://hooks.zapier.com/hooks/catch/23408429/uouxrfg/';
+  
+  const payload = { 
+    ref, 
+    orderId,
+    timestamp: new Date().toISOString(),
+    source: 'fraffil-api'
+  };
+  
+  console.log('🚀 Sending to Zapier:', payload);
 
   try {
     const zapierRes = await fetch(zapierWebhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref, orderId }),
+      body: JSON.stringify(payload),
     });
 
+    console.log('📡 Zapier response status:', zapierRes.status);
+    
     if (!zapierRes.ok) {
-      throw new Error('Zapier webhook error');
+      const errorText = await zapierRes.text();
+      console.log('❌ Zapier error response:', errorText);
+      throw new Error(`Zapier webhook error: ${zapierRes.status}`);
     }
 
-    return res.status(200).json({ success: true });
+    const zapierResult = await zapierRes.json();
+    console.log('✅ Zapier success:', zapierResult);
+
+    return res.status(200).json({ success: true, zapierResult });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
