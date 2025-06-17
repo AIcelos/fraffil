@@ -28,6 +28,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing ref or orderId' });
   }
 
+  // Duplicate protection - store processed orders in memory (simple approach)
+  // In production, consider using a database or Redis for persistence
+  global.processedOrders = global.processedOrders || new Set();
+  const orderKey = `${ref}-${orderId}`;
+  
+  if (global.processedOrders.has(orderKey)) {
+    console.log('⚠️ Duplicate order detected, skipping:', orderKey);
+    return res.status(200).json({ success: true, message: 'Duplicate order, skipped' });
+  }
+  
+  // Mark this order as processed
+  global.processedOrders.add(orderKey);
+
   // Vervang hieronder door jouw echte Zapier webhook URL!
   const zapierWebhookUrl = 'https://hooks.zapier.com/hooks/catch/23408429/uouxrfg/';
   
