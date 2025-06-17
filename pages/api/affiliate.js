@@ -32,8 +32,8 @@ export default async function handler(req, res) {
   const zapierWebhookUrl = 'https://hooks.zapier.com/hooks/catch/23408429/uouxrfg/';
   
   const payload = { 
-    ref, 
-    orderId,
+    Ref: ref,
+    "Order Id": orderId,
     timestamp: new Date().toISOString(),
     source: 'fraffil-api'
   };
