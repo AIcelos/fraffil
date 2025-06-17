@@ -1,4 +1,5 @@
 import googleSheetsService from '../../../lib/googleSheets';
+import { getAllInfluencers } from '../../../lib/database.js';
 
 export default async function handler(req, res) {
   // CORS headers
@@ -26,16 +27,38 @@ export default async function handler(req, res) {
     
     console.log('Found influencers:', influencerNames);
 
+    // Get influencer profiles from database
+    let dbInfluencers = [];
+    try {
+      dbInfluencers = await getAllInfluencers();
+    } catch (dbError) {
+      console.log('📋 Database not available, using basic profiles');
+    }
+
     // Calculate stats for each influencer
     const influencerStats = await Promise.all(
       influencerNames.map(async (name) => {
         const stats = await googleSheetsService.getInfluencerStats(name);
+        
+        // Find database profile for this influencer
+        const dbProfile = dbInfluencers.find(inf => inf.ref === name);
+        
         return {
           name: name,
           totalSales: stats.totalSales,
           totalRevenue: stats.totalRevenue,
           lastSale: stats.lastSale,
-          recentOrders: stats.recentOrders
+          recentOrders: stats.recentOrders,
+          // Add database profile data
+          email: dbProfile?.email || '',
+          phone: dbProfile?.phone || '',
+          commission: dbProfile?.commission || 10.00,
+          status: dbProfile?.status || 'active',
+          instagram: dbProfile?.instagram || '',
+          tiktok: dbProfile?.tiktok || '',
+          youtube: dbProfile?.youtube || '',
+          notes: dbProfile?.notes || '',
+          profileComplete: !!dbProfile
         };
       })
     );

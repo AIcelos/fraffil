@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:init": "node scripts/init-database.js",
+    "db:reset": "node scripts/init-database.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@vercel/postgres": "^0.10.0",
     "googleapis": "^150.0.1",
     "next": "^15.3.3",
     "react": "^19.1.0",
