@@ -72,6 +72,12 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Account is inactive' });
     }
 
+    // Check if user has a password
+    if (!influencer.password) {
+      console.log('❌ No password set for user:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
     // Verify password
     const isValidPassword = await bcrypt.compare(password, influencer.password);
     
@@ -99,6 +105,11 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Login error:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      username: username
+    });
     
     // If database error, provide helpful message
     if (error.message.includes('missing_connection_string')) {
@@ -107,6 +118,15 @@ export default async function handler(req, res) {
       });
     }
     
-    return res.status(500).json({ error: 'Login failed' });
+    // If bcrypt error
+    if (error.message.includes('bcrypt') || error.message.includes('hash')) {
+      console.error('❌ bcrypt error - user may not have password set');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    return res.status(500).json({ 
+      error: 'Login failed',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 } 
