@@ -75,12 +75,26 @@ export default function InfluencerDetail() {
 
   const handleSave = async () => {
     try {
+      // Prepare minimal data to avoid database column issues
+      const minimalData = {
+        ref: ref,
+        name: formData.name || ref,
+        email: formData.email || '',
+        phone: formData.phone || '',
+        instagram: formData.instagram || '',
+        tiktok: formData.tiktok || '',
+        commission: formData.commission || 10,
+        status: formData.status || 'active',
+        notes: formData.notes || ''
+        // Exclude 'website' and other problematic fields
+      };
+
       const response = await fetch(`/api/admin/influencer/${ref}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(minimalData),
       });
 
       const result = await response.json();
