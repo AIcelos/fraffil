@@ -216,6 +216,77 @@ export default function EmailTester() {
           </div>
         )}
 
+        {/* Template Customization */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">🎨 Template Aanpassingen</h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="font-medium mb-2">Brand Kleuren</h3>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}></div>
+                  <span className="text-sm">Primary Gradient (#667eea → #764ba2)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-gray-900 rounded"></div>
+                  <span className="text-sm">Text Color (#1f2937)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 bg-gray-600 rounded"></div>
+                  <span className="text-sm">Secondary Text (#4b5563)</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className="font-medium mb-2">Template Features</h3>
+              <ul className="text-sm space-y-1 text-gray-600">
+                <li>✅ Responsive design voor alle devices</li>
+                <li>✅ Dark mode compatible</li>
+                <li>✅ Professional typography</li>
+                <li>✅ Consistent branding</li>
+                <li>✅ Social media integration</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Advanced Testing */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">🧪 Geavanceerd Testen</h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            <button
+              onClick={() => window.open('/api/test-email-config', '_blank')}
+              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            >
+              <h3 className="font-medium text-gray-900 mb-1">Email Config</h3>
+              <p className="text-sm text-gray-600">Test email configuratie en API keys</p>
+            </button>
+            
+            <button
+              onClick={() => {
+                const testData = {
+                  type: 'welcome',
+                  email: email || 'test@example.com'
+                };
+                navigator.clipboard.writeText(JSON.stringify(testData, null, 2));
+                alert('Test data gekopieerd naar clipboard!');
+              }}
+              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            >
+              <h3 className="font-medium text-gray-900 mb-1">API Data</h3>
+              <p className="text-sm text-gray-600">Kopieer test JSON naar clipboard</p>
+            </button>
+            
+            <button
+              onClick={() => window.open('https://resend.com/emails', '_blank')}
+              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+            >
+              <h3 className="font-medium text-gray-900 mb-1">Resend Dashboard</h3>
+              <p className="text-sm text-gray-600">Bekijk email logs en analytics</p>
+            </button>
+          </div>
+        </div>
+
         {/* Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">
@@ -227,6 +298,7 @@ export default function EmailTester() {
             <li>• Check je spam folder als je de emails niet ontvangt</li>
             <li>• De templates zijn responsive en werken op alle email clients</li>
             <li>• Elke email heeft een unieke preheader tekst voor betere deliverability</li>
+            <li>• Template aanpassingen kunnen worden gemaakt in <code>lib/email.js</code></li>
           </ul>
         </div>
       </div>

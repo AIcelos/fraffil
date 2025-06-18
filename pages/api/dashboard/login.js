@@ -1,14 +1,5 @@
-// Simpele in-memory opslag voor influencers
-// Later vervangen door database
-const INFLUENCERS = {
-  'annemieke': { password: 'annemieke123', name: 'Annemieke' },
-  'stefan': { password: 'stefan123', name: 'Stefan' },
-  'lisa': { password: 'lisa123', name: 'Lisa' },
-  'mark': { password: 'mark123', name: 'Mark' },
-  // Echte influencers uit Google Sheets
-  'finaltest': { password: 'finaltest123', name: 'Final Test' },
-  'manual-test-456': { password: 'test123', name: 'Manual Test' }
-};
+import { getInfluencer } from '../../../lib/database.js';
+import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
   // CORS headers
@@ -32,28 +23,90 @@ export default async function handler(req, res) {
   }
 
   try {
-    const influencer = INFLUENCERS[username.toLowerCase()];
+    console.log('🔐 Login attempt for:', username);
+
+    // Check database availability
+    if (!process.env.POSTGRES_URL) {
+      console.log('⚠️  Database not configured - using fallback authentication');
+      
+      // Fallback voor development zonder database
+      const FALLBACK_USERS = {
+        'annemieke': { password: 'annemieke123', name: 'Annemieke' },
+        'stefan': { password: 'stefan123', name: 'Stefan' },
+        'lisa': { password: 'lisa123', name: 'Lisa' },
+        'mark': { password: 'mark123', name: 'Mark' },
+        'finaltest': { password: 'finaltest123', name: 'Final Test' },
+        'manual-test-456': { password: 'test123', name: 'Manual Test' }
+      };
+
+      const user = FALLBACK_USERS[username.toLowerCase()];
+      
+      if (!user || user.password !== password) {
+        console.log('❌ Failed fallback login for:', username);
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      console.log('✅ Successful fallback login for:', username);
+      return res.status(200).json({
+        success: true,
+        influencer: {
+          username: username.toLowerCase(),
+          name: user.name,
+          loginTime: new Date().toISOString(),
+          source: 'fallback'
+        }
+      });
+    }
+
+    // Database authentication
+    const influencer = await getInfluencer(username.toLowerCase());
     
-    if (!influencer || influencer.password !== password) {
-      console.log('❌ Failed login attempt for:', username);
+    if (!influencer) {
+      console.log('❌ Influencer not found:', username);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('✅ Successful login for:', username);
+    // Check if account is active
+    if (influencer.status !== 'active') {
+      console.log('❌ Inactive account:', username);
+      return res.status(401).json({ error: 'Account is inactive' });
+    }
 
-    // In productie zou je hier een JWT token genereren
-    // Voor nu sturen we gewoon de influencer data terug
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, influencer.password);
+    
+    if (!isValidPassword) {
+      console.log('❌ Invalid password for:', username);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    console.log('✅ Successful database login for:', username);
+
+    // Update last login time (optional)
+    // await updateInfluencerLastLogin(username);
+
     return res.status(200).json({
       success: true,
       influencer: {
-        username: username.toLowerCase(),
+        username: influencer.username || influencer.ref,
         name: influencer.name,
-        loginTime: new Date().toISOString()
+        email: influencer.email,
+        commission: influencer.commission,
+        loginTime: new Date().toISOString(),
+        source: 'database'
       }
     });
 
   } catch (error) {
     console.error('❌ Login error:', error);
+    
+    // If database error, provide helpful message
+    if (error.message.includes('missing_connection_string')) {
+      return res.status(500).json({ 
+        error: 'Database connection not configured. Contact administrator.' 
+      });
+    }
+    
     return res.status(500).json({ error: 'Login failed' });
   }
 } 
