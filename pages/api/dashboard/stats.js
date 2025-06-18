@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     
     // Define fallback commission rates first
     const fallbackCommissions = {
-      'finaltest': 7,
+      'finaltest': 6,
       'testuser': 6
     };
     
