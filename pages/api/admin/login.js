@@ -28,7 +28,8 @@ export default async function handler(req, res) {
   const adminCredentials = {
     'admin': 'admin123',
     'filright': 'filright2025',
-    'stefan': 'stefan_admin123'
+    'stefan': 'stefan_admin123',
+    'sven': 'sven_admin_2025'
   };
 
   if (adminCredentials[username] && adminCredentials[username] === password) {
