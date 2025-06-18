@@ -121,6 +121,19 @@ const LoginPage = () => {
               )}
             </button>
 
+            {/* Registration Link */}
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                Nog geen account?{' '}
+                <a 
+                  href="/register" 
+                  className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                >
+                  🚀 Registreer als nieuwe affiliate
+                </a>
+              </p>
+            </div>
+
             {/* Demo credentials */}
             <div className="mt-6 p-4 bg-gray-50 rounded-md">
               <h3 className="text-sm font-medium text-gray-900 mb-2">Demo accounts:</h3>
