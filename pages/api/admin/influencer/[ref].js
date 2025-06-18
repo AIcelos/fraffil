@@ -8,6 +8,8 @@ import {
 export default async function handler(req, res) {
   const { ref } = req.query;
   
+  console.log(`🔧 Admin Influencer API v2.0 - ${req.method} request for: ${ref}`);
+  
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -18,9 +20,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Check if database is configured
+    // Check if database is configured (v2.0 - graceful fallback)
     if (!process.env.POSTGRES_URL) {
-      console.log('⚠️  Database not configured - POSTGRES_URL missing');
+      console.log('⚠️  Database not configured - POSTGRES_URL missing (v2.0)');
       
       // Return fallback response for GET requests
       if (req.method === 'GET') {
