@@ -54,11 +54,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // Hash wachtwoord
-      const saltRounds = 12;
-      const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
-
-      // Maak gebruiker aan
+      // Maak gebruiker aan (password wordt gehashed in createInfluencer)
       const result = await createInfluencer({
         ref: userData.ref,
         name: userData.name,
@@ -70,7 +66,7 @@ export default async function handler(req, res) {
         commission: parseFloat(userData.commission) || 6.00,
         status: userData.status || 'active',
         notes: userData.notes || '',
-        password: hashedPassword
+        password: userData.password // Plain text - wordt gehashed in createInfluencer
       });
 
       if (result.success) {
