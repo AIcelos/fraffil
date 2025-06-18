@@ -1,4 +1,4 @@
-import { sendWelcomeEmail, sendSaleNotificationEmail, testEmailService } from '../../lib/email.js';
+import { emailService } from '../../lib/email.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,66 +6,101 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { type, data } = req.body;
+    const { type, email } = req.body;
 
-    console.log('📧 Email test request:', { type, hasData: !!data });
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    console.log(`🧪 Testing ${type} email to: ${email}`);
+
+    let result;
 
     switch (type) {
-      case 'test':
-        const testResult = await testEmailService();
-        return res.json({
-          success: testResult.success,
-          message: testResult.success ? 'Email service is working!' : 'Email service failed',
-          details: testResult
-        });
-
       case 'welcome':
-        if (!data || !data.email || !data.username) {
-          return res.status(400).json({ 
-            error: 'Missing required fields: email, username' 
-          });
-        }
-
-        const welcomeData = {
-          email: data.email,
-          name: data.name || data.username,
-          username: data.username,
-          tempPassword: data.tempPassword || 'temp123456'
-        };
-
-        const welcomeResult = await sendWelcomeEmail(welcomeData);
-        return res.json({
-          success: welcomeResult.success,
-          message: welcomeResult.success ? 'Welcome email sent!' : 'Failed to send welcome email',
-          details: welcomeResult
-        });
+        result = await emailService.sendWelcomeEmail(
+          email,
+          'Test Gebruiker',
+          'testuser',
+          'TempPass123!'
+        );
+        break;
 
       case 'sale':
-        if (!data || !data.influencer || !data.sale) {
-          return res.status(400).json({ 
-            error: 'Missing required fields: influencer, sale' 
-          });
-        }
+        result = await emailService.sendSaleNotification(
+          email,
+          'Test Gebruiker',
+          {
+            orderId: 'TEST001',
+            amount: 299.99,
+            commission: 17.99,
+            product: 'FilRight Premium Product',
+            date: new Date().toISOString()
+          }
+        );
+        break;
 
-        const saleResult = await sendSaleNotificationEmail(data.influencer, data.sale);
-        return res.json({
-          success: saleResult.success,
-          message: saleResult.success ? 'Sale notification sent!' : 'Failed to send sale notification',
-          details: saleResult
-        });
+      case 'weekly':
+        result = await emailService.sendWeeklyReport(
+          email,
+          'Test Gebruiker',
+          {
+            totalSales: 5,
+            totalRevenue: '1,247.50',
+            totalCommission: '74.85',
+            period: '11 - 17 Juni 2025',
+            topProducts: [
+              {
+                name: 'FilRight Premium',
+                sales: 3,
+                revenue: '897.50',
+                commission: '53.85'
+              },
+              {
+                name: 'FilRight Basic',
+                sales: 2,
+                revenue: '350.00',
+                commission: '21.00'
+              }
+            ]
+          }
+        );
+        break;
+
+      case 'password-reset':
+        result = await emailService.sendPasswordReset(
+          email,
+          'Test Gebruiker',
+          'test-reset-token-123456789'
+        );
+        break;
 
       default:
-        return res.status(400).json({ 
-          error: 'Invalid email type. Use: test, welcome, or sale' 
-        });
+        return res.status(400).json({ error: 'Invalid email type. Use: welcome, sale, weekly, or password-reset' });
+    }
+
+    if (result.success) {
+      console.log(`✅ ${type} email test successful:`, result.messageId);
+      res.status(200).json({
+        success: true,
+        message: `${type} email sent successfully`,
+        messageId: result.messageId,
+        type: type
+      });
+    } else {
+      console.error(`❌ ${type} email test failed:`, result.error);
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        type: type
+      });
     }
 
   } catch (error) {
-    console.error('❌ Email test error:', error);
-    return res.status(500).json({
+    console.error('❌ Email test exception:', error);
+    res.status(500).json({
       success: false,
-      error: error.message,
-      details: error
+      error: error.message
     });
   }
 }
@@ -74,35 +109,25 @@ export default async function handler(req, res) {
 /*
 POST /api/test-email
 {
-  "type": "test"
-}
-
-POST /api/test-email
-{
   "type": "welcome",
-  "data": {
-    "email": "test@example.com",
-    "username": "testuser",
-    "name": "Test User",
-    "tempPassword": "temp123456"
-  }
+  "email": "test@example.com"
 }
 
 POST /api/test-email
 {
   "type": "sale",
-  "data": {
-    "influencer": {
-      "email": "influencer@example.com",
-      "name": "Test Influencer",
-      "username": "testinfluencer"
-    },
-    "sale": {
-      "orderId": "TEST001",
-      "amount": 99.99,
-      "commission": 6,
-      "commissionAmount": 5.99
-    }
-  }
+  "email": "influencer@example.com"
+}
+
+POST /api/test-email
+{
+  "type": "weekly",
+  "email": "test@example.com"
+}
+
+POST /api/test-email
+{
+  "type": "password-reset",
+  "email": "test@example.com"
 }
 */ 

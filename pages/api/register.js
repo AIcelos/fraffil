@@ -1,10 +1,14 @@
 import { createInfluencer } from '../../lib/database.js';
-import { sendWelcomeEmail } from '../../lib/email.js';
-import crypto from 'crypto';
+import { emailService } from '../../lib/email.js';
 
-// Generate temporary password
+// Functie om een tijdelijk wachtwoord te genereren
 function generateTempPassword() {
-  return crypto.randomBytes(8).toString('hex').slice(0, 12);
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 // Validate email format
@@ -25,7 +29,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('📝 New influencer registration request');
+    console.log('📝 Registration request received:', { username: req.body.username, email: req.body.email, name: req.body.name });
     
     const {
       username,
@@ -69,7 +73,7 @@ export default async function handler(req, res) {
 
     // Generate temporary password
     const tempPassword = generateTempPassword();
-    console.log(`🔑 Generated temp password for ${username}: ${tempPassword}`);
+    console.log('🔐 Generated temp password for:', username);
 
     // Prepare influencer data
     const influencerData = {
@@ -116,23 +120,27 @@ export default async function handler(req, res) {
 
     console.log('✅ Influencer created in database');
 
-    // Send welcome email
-    const emailData = {
-      email: influencerData.email,
-      name: influencerData.name,
-      username: influencerData.username,
-      tempPassword: tempPassword
-    };
-
     console.log('📧 Sending welcome email...');
-    const emailResult = await sendWelcomeEmail(emailData);
+    const emailResult = await emailService.sendWelcomeEmail(
+      influencerData.email,
+      influencerData.name,
+      influencerData.username,
+      tempPassword
+    );
     
     if (!emailResult.success) {
-      console.warn('⚠️ Welcome email failed to send:', emailResult.error);
-      // Don't fail registration if email fails - user can still login
-    } else {
-      console.log('✅ Welcome email sent successfully');
+      console.error('❌ Email error:', emailResult.error);
+      // Account is al aangemaakt, maar email faalde
+      return res.status(201).json({
+        success: true,
+        message: 'Account succesvol aangemaakt! Er was een probleem met het versturen van de welkomst email. Neem contact op met support voor je login gegevens.',
+        username: influencerData.username,
+        emailSent: false,
+        emailError: emailResult.error
+      });
     }
+
+    console.log('✅ Welcome email sent successfully');
 
     // Success response (don't include password)
     res.status(201).json({
@@ -143,7 +151,8 @@ export default async function handler(req, res) {
         email: influencerData.email,
         name: influencerData.name,
         commission: influencerData.commission,
-        emailSent: emailResult.success
+        emailSent: emailResult.success,
+        messageId: emailResult.messageId
       }
     });
 
