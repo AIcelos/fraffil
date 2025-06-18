@@ -299,7 +299,27 @@ export default function EmailTester() {
             <li>• De templates zijn responsive en werken op alle email clients</li>
             <li>• Elke email heeft een unieke preheader tekst voor betere deliverability</li>
             <li>• Template aanpassingen kunnen worden gemaakt in <code>lib/email.js</code></li>
+            <li>• Password reset links zijn 1 uur geldig en werken slechts één keer</li>
           </ul>
+        </div>
+
+        <div className="bg-green-50 border border-green-200 rounded-xl p-6 mt-6">
+          <h3 className="text-lg font-semibold text-green-900 mb-3">
+            🔐 Password Reset Functionaliteit
+          </h3>
+          <div className="text-green-800 space-y-2 text-sm">
+            <p><strong>Nieuwe functies toegevoegd:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4">
+              <li><code>/forgot-password</code> - Pagina om reset aan te vragen</li>
+              <li><code>/reset-password</code> - Pagina om nieuw wachtwoord in te stellen</li>
+              <li><code>/api/forgot-password</code> - API voor reset email verzenden</li>
+              <li><code>/api/reset-password</code> - API voor wachtwoord wijzigen</li>
+            </ul>
+            <p className="mt-3">
+              <strong>Gebruik:</strong> Ga naar de login pagina en klik op "🔐 Wachtwoord vergeten?" 
+              om het complete reset proces te testen.
+            </p>
+          </div>
         </div>
       </div>
     </div>

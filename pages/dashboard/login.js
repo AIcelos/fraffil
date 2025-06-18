@@ -121,8 +121,16 @@ const LoginPage = () => {
               )}
             </button>
 
-            {/* Registration Link */}
-            <div className="text-center">
+            {/* Registration & Password Reset Links */}
+            <div className="text-center space-y-3">
+              <p className="text-sm text-gray-600">
+                <a 
+                  href="/forgot-password" 
+                  className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
+                >
+                  🔐 Wachtwoord vergeten?
+                </a>
+              </p>
               <p className="text-sm text-gray-600">
                 Nog geen account?{' '}
                 <a 
