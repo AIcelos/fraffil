@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // Admin credentials - in production, use environment variables or database
+  // Admin credentials - Updated with sven@filright.com access
   const adminCredentials = {
     'admin': 'admin123',
     'filright': 'filright2025',
