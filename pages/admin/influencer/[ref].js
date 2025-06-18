@@ -90,11 +90,15 @@ export default function InfluencerDetail() {
         setEditing(false);
         alert('Influencer profiel opgeslagen!');
       } else {
-        alert('Error: ' + result.error);
+        if (response.status === 503) {
+          alert('Database niet beschikbaar - wijzigingen kunnen niet worden opgeslagen.\n\nFout: ' + result.message);
+        } else {
+          alert('Error: ' + (result.error || result.message || 'Onbekende fout'));
+        }
       }
     } catch (error) {
       console.error('Error saving influencer:', error);
-      alert('Er is een fout opgetreden bij het opslaan');
+      alert('Er is een fout opgetreden bij het opslaan: ' + error.message);
     }
   };
 

@@ -18,19 +18,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (req.method === 'GET') {
-      // GET - Fetch influencer profile
-      console.log(`📊 Fetching influencer profile for: ${ref}`);
+    // Check if database is configured
+    if (!process.env.POSTGRES_URL) {
+      console.log('⚠️  Database not configured - POSTGRES_URL missing');
       
-      const influencerData = await getInfluencer(ref);
-      
-      if (influencerData) {
-        return res.status(200).json({
-          success: true,
-          data: influencerData
-        });
-      } else {
-        // Return default profile if not found
+      // Return fallback response for GET requests
+      if (req.method === 'GET') {
         const defaultProfile = {
           ref: ref,
           name: ref,
@@ -47,7 +40,74 @@ export default async function handler(req, res) {
         return res.status(200).json({
           success: true,
           data: defaultProfile,
-          isDefault: true
+          isDefault: true,
+          message: 'Database not configured, using defaults'
+        });
+      }
+      
+      // For POST/PUT/DELETE, return error since we can't save
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured - cannot save changes',
+        message: 'Please configure POSTGRES_URL environment variable'
+      });
+    }
+
+    if (req.method === 'GET') {
+      // GET - Fetch influencer profile
+      console.log(`📊 Fetching influencer profile for: ${ref}`);
+      
+      try {
+        const influencerData = await getInfluencer(ref);
+        
+        if (influencerData) {
+          return res.status(200).json({
+            success: true,
+            data: influencerData
+          });
+        } else {
+          // Return default profile if not found
+          const defaultProfile = {
+            ref: ref,
+            name: ref,
+            email: '',
+            phone: '',
+            instagram: '',
+            tiktok: '',
+            youtube: '',
+            commission: 10.00,
+            status: 'active',
+            notes: ''
+          };
+          
+          return res.status(200).json({
+            success: true,
+            data: defaultProfile,
+            isDefault: true
+          });
+        }
+      } catch (dbError) {
+        console.log('⚠️  Database error during GET:', dbError.message);
+        
+        // Return default profile on database error
+        const defaultProfile = {
+          ref: ref,
+          name: ref,
+          email: '',
+          phone: '',
+          instagram: '',
+          tiktok: '',
+          youtube: '',
+          commission: 10.00,
+          status: 'active',
+          notes: ''
+        };
+        
+        return res.status(200).json({
+          success: true,
+          data: defaultProfile,
+          isDefault: true,
+          message: 'Database error, using defaults'
         });
       }
       
@@ -56,38 +116,59 @@ export default async function handler(req, res) {
       console.log(`💾 Saving influencer profile for: ${ref}`);
       console.log('📋 Profile data:', req.body);
       
-      const profileData = { ...req.body, ref };
-      
-      // Check if influencer exists
-      const existingInfluencer = await getInfluencer(ref);
-      
-      let result;
-      if (existingInfluencer) {
-        // Update existing influencer
-        result = await updateInfluencer(ref, profileData);
-        console.log(`✅ Updated influencer: ${ref}`);
-      } else {
-        // Create new influencer
-        result = await createInfluencer(profileData);
-        console.log(`✅ Created new influencer: ${ref}`);
+      try {
+        const profileData = { ...req.body, ref };
+        
+        // Check if influencer exists
+        const existingInfluencer = await getInfluencer(ref);
+        
+        let result;
+        if (existingInfluencer) {
+          // Update existing influencer
+          result = await updateInfluencer(ref, profileData);
+          console.log(`✅ Updated influencer: ${ref}`);
+        } else {
+          // Create new influencer
+          result = await createInfluencer(profileData);
+          console.log(`✅ Created new influencer: ${ref}`);
+        }
+        
+        return res.status(200).json({
+          success: true,
+          data: result,
+          message: existingInfluencer ? 'Influencer updated successfully' : 'Influencer created successfully'
+        });
+      } catch (dbError) {
+        console.log('⚠️  Database error during POST:', dbError.message);
+        
+        return res.status(503).json({
+          success: false,
+          error: 'Database error - cannot save changes',
+          message: dbError.message,
+          details: process.env.NODE_ENV === 'development' ? dbError.stack : undefined
+        });
       }
-      
-      return res.status(200).json({
-        success: true,
-        data: result,
-        message: existingInfluencer ? 'Influencer updated successfully' : 'Influencer created successfully'
-      });
       
     } else if (req.method === 'DELETE') {
       // DELETE - Remove influencer profile
       console.log(`🗑️ Deleting influencer profile for: ${ref}`);
       
-      await deleteInfluencer(ref);
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Influencer deleted successfully'
-      });
+      try {
+        await deleteInfluencer(ref);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Influencer deleted successfully'
+        });
+      } catch (dbError) {
+        console.log('⚠️  Database error during DELETE:', dbError.message);
+        
+        return res.status(503).json({
+          success: false,
+          error: 'Database error - cannot delete',
+          message: dbError.message
+        });
+      }
       
     } else {
       return res.status(405).json({

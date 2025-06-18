@@ -120,7 +120,35 @@
 
 ## 📈 FASE 4: ADVANCED FEATURES (Future)
 
-### 4.1 📧 Notification System ⭐⭐⭐
+### 4.1 🧾 Facturatie System ⭐⭐⭐⭐⭐
+**Automated Invoice & Payment Management** 🆕
+
+**Facturatie Features:**
+- **Automatische Factuurcreatie:**
+  - Maandelijkse commissie facturen
+  - PDF generatie met bedrijfslogo
+  - Automatische berekeningen (commissie + BTW)
+  - Factuur nummerreeks management
+
+- **Betaalstatus Tracking:**
+  - Betaalstatus per factuur (open/betaald/vervallen)
+  - Automatische herinneringen
+  - Betaalgeschiedenis per influencer
+  - Openstaande bedragen overzicht
+
+- **Compliance & Rapportage:**
+  - BTW berekeningen (21% NL)
+  - Jaarlijkse commissie overzichten
+  - Export naar boekhoudpakketten
+  - Fiscale rapportages
+
+- **Admin Panel Integratie:**
+  - Facturatie dashboard in admin panel
+  - Bulk factuur generatie
+  - Betaalstatus management
+  - Commissie goedkeuring workflow
+
+### 4.2 📧 Notification System ⭐⭐⭐
 **Automated Communications**
 
 **Notification Types:**
@@ -128,8 +156,9 @@
 - Weekly performance reports
 - Monthly summaries
 - Milestone achievements
+- Factuur notificaties & herinneringen
 
-### 4.2 🔐 Enhanced Security ⭐⭐⭐⭐
+### 4.3 🔐 Enhanced Security ⭐⭐⭐⭐
 **JWT + Advanced Authentication**
 
 **Security Upgrades:**
@@ -196,6 +225,14 @@
 6. Build commission calculation logic
 7. Create payment tracking system
 8. Add commission reports to admin panel
+
+**Priority 3: Facturatie System** 🧾 **NEW!**
+9. Build facturatie module voor influencers
+10. Automatische factuur generatie
+11. PDF export functionaliteit
+12. Betaalstatus tracking
+13. Maandelijkse commissie overzichten
+14. BTW berekeningen en compliance
 
 ## 🗄️ **PHASE 4: DATABASE INTEGRATION** 🚧 **IN PROGRESS**
 
