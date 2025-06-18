@@ -226,13 +226,21 @@
 7. Create payment tracking system
 8. Add commission reports to admin panel
 
-**Priority 3: Facturatie System** 🧾 **NEW!**
-9. Build facturatie module voor influencers
-10. Automatische factuur generatie
-11. PDF export functionaliteit
-12. Betaalstatus tracking
-13. Maandelijkse commissie overzichten
-14. BTW berekeningen en compliance
+**Priority 3: Dashboard Thema's & Personalisatie** 🎨 **NEW!**
+9. Thema selectie systeem (licht/donker/auto)
+10. Kleurenschema opties (grijs, blauw, groen, paars)
+11. Gebruiker thema voorkeuren opslag
+12. Toegankelijkheids opties (hoog contrast, kleurenblind vriendelijk)
+13. Responsive thema optimalisaties
+14. White-label branding mogelijkheden
+
+**Priority 4: Facturatie System** 🧾 **NEW!**
+15. Build facturatie module voor influencers
+16. Automatische factuur generatie
+17. PDF export functionaliteit
+18. Betaalstatus tracking
+19. Maandelijkse commissie overzichten
+20. BTW berekeningen en compliance
 
 ## 🗄️ **PHASE 4: DATABASE INTEGRATION** 🚧 **IN PROGRESS**
 

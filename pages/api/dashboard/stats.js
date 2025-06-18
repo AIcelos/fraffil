@@ -75,42 +75,43 @@ export default async function handler(req, res) {
     
     // Get influencer profile from database (for commission rate)
     let influencerProfile = null;
-    try {
-      console.log('🔍 Attempting to fetch influencer profile for:', influencer);
-      
-      // Check if database is configured
-      if (!process.env.POSTGRES_URL) {
-        console.log('⚠️  Database not configured - POSTGRES_URL missing');
-        throw new Error('Database not configured');
+    
+    // Define fallback commission rates first
+    const fallbackCommissions = {
+      'finaltest': 7,
+      'testuser': 6
+    };
+    
+    // Check if database is configured and try to get profile
+    if (process.env.POSTGRES_URL) {
+      try {
+        console.log('🔍 Attempting to fetch influencer profile for:', influencer);
+        influencerProfile = await getInfluencer(influencer);
+        console.log('📋 Raw database result:', JSON.stringify(influencerProfile, null, 2));
+        if (influencerProfile) {
+          console.log('✅ Found profile - ref:', influencerProfile.ref, 'commission:', influencerProfile.commission);
+        } else {
+          console.log('❌ No profile found in database for:', influencer);
+        }
+      } catch (dbError) {
+        console.log('⚠️  Database error for influencer:', influencer, 'Error:', dbError.message);
+        console.log('📋 Full error:', dbError);
+        influencerProfile = null; // Reset to null so fallback will be used
       }
-      
-      influencerProfile = await getInfluencer(influencer);
-      console.log('📋 Raw database result:', JSON.stringify(influencerProfile, null, 2));
-      if (influencerProfile) {
-        console.log('✅ Found profile - ref:', influencerProfile.ref, 'commission:', influencerProfile.commission);
-      } else {
-        console.log('❌ No profile found in database for:', influencer);
-      }
-    } catch (dbError) {
-      console.log('⚠️  Database error for influencer:', influencer, 'Error:', dbError.message);
-      console.log('📋 Full error:', dbError);
-      
-      // If database fails, try to use fallback commission rates
-      const fallbackCommissions = {
-        'finaltest': 7,
-        'testuser': 6
+    } else {
+      console.log('⚠️  Database not configured - POSTGRES_URL missing');
+    }
+    
+    // Use fallback if no database profile found
+    if (!influencerProfile && fallbackCommissions[influencer]) {
+      console.log('🔄 Using fallback commission rate for:', influencer, '=', fallbackCommissions[influencer] + '%');
+      influencerProfile = {
+        ref: influencer,
+        commission: fallbackCommissions[influencer],
+        name: influencer,
+        email: '',
+        phone: ''
       };
-      
-      if (fallbackCommissions[influencer]) {
-        console.log('🔄 Using fallback commission rate for:', influencer, '=', fallbackCommissions[influencer] + '%');
-        influencerProfile = {
-          ref: influencer,
-          commission: fallbackCommissions[influencer],
-          name: influencer,
-          email: '',
-          phone: ''
-        };
-      }
     }
 
     // Get real data from Google Sheets
