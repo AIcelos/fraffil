@@ -1,4 +1,4 @@
-import { updateInfluencerPassword } from '../../lib/database.js';
+import { updateInfluencerPassword, getResetToken, markResetTokenAsUsed } from '../../lib/database.js';
 import { resetTokens } from './forgot-password.js';
 import bcrypt from 'bcryptjs';
 
@@ -34,8 +34,31 @@ export default async function handler(req, res) {
 
     console.log('🔐 Password reset attempt with token:', token.substring(0, 8) + '...');
 
-    // Controleer token
-    const tokenData = resetTokens.get(token);
+    // Eerst controleren in database
+    let tokenData = await getResetToken(token);
+    let usingDatabase = true;
+
+    // Als niet gevonden in database, controleer in-memory fallback
+    if (!tokenData) {
+      console.log('⚠️  Token not found in database, checking in-memory fallback');
+      const memoryTokenData = resetTokens.get(token);
+      
+      if (memoryTokenData) {
+        // Converteer in-memory format naar database format
+        tokenData = {
+          token: token,
+          email: memoryTokenData.email,
+          username: memoryTokenData.username,
+          name: memoryTokenData.name,
+          expires_at: new Date(memoryTokenData.expiry),
+          used: memoryTokenData.used
+        };
+        usingDatabase = false;
+        console.log('✅ Found token in in-memory storage');
+      }
+    } else {
+      console.log('✅ Found token in database');
+    }
     
     if (!tokenData) {
       console.log('❌ Invalid reset token:', token.substring(0, 8) + '...');
@@ -46,9 +69,19 @@ export default async function handler(req, res) {
     }
 
     // Controleer expiry
-    if (Date.now() > tokenData.expiry) {
+    const now = new Date();
+    const expiryDate = new Date(tokenData.expires_at);
+    
+    if (now > expiryDate) {
       console.log('❌ Expired reset token for:', tokenData.username);
-      resetTokens.delete(token);
+      
+      // Cleanup van verlopen token
+      if (usingDatabase) {
+        await markResetTokenAsUsed(token);
+      } else {
+        resetTokens.delete(token);
+      }
+      
       return res.status(400).json({
         success: false,
         error: 'Reset link is verlopen. Vraag een nieuwe aan.'
@@ -97,19 +130,29 @@ export default async function handler(req, res) {
     }
 
     // Markeer token als gebruikt
-    tokenData.used = true;
-    
-    // Verwijder token na 5 minuten voor cleanup
-    setTimeout(() => {
-      resetTokens.delete(token);
-    }, 5 * 60 * 1000);
+    if (usingDatabase) {
+      await markResetTokenAsUsed(token);
+    } else {
+      // Update in-memory token
+      const memoryToken = resetTokens.get(token);
+      if (memoryToken) {
+        memoryToken.used = true;
+        // Verwijder token na 5 minuten voor cleanup
+        setTimeout(() => {
+          resetTokens.delete(token);
+        }, 5 * 60 * 1000);
+      }
+    }
 
     console.log('✅ Password successfully reset for:', tokenData.username);
 
     res.status(200).json({
       success: true,
       message: 'Wachtwoord succesvol gewijzigd! Je kunt nu inloggen met je nieuwe wachtwoord.',
-      username: tokenData.username
+      username: tokenData.username,
+      debug: process.env.NODE_ENV === 'development' ? {
+        tokenStorage: usingDatabase ? 'database' : 'in-memory'
+      } : undefined
     });
 
   } catch (error) {

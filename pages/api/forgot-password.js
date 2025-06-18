@@ -1,8 +1,8 @@
-import { getInfluencerByEmail } from '../../lib/database.js';
+import { getInfluencerByEmail, saveResetToken, cleanupExpiredTokens } from '../../lib/database.js';
 import { emailService } from '../../lib/email.js';
 import crypto from 'crypto';
 
-// In-memory storage voor reset tokens (in productie: gebruik database)
+// In-memory fallback voor development (alleen als database niet beschikbaar is)
 const resetTokens = new Map();
 
 // Token geldigheid: 1 uur
@@ -25,6 +25,9 @@ export default async function handler(req, res) {
 
     console.log('🔐 Password reset request for:', email);
 
+    // Cleanup oude tokens
+    await cleanupExpiredTokens();
+
     // Zoek gebruiker in database (met fallback voor development)
     let influencer = null;
     
@@ -38,12 +41,14 @@ export default async function handler(req, res) {
         'test@example.com': {
           email: 'test@example.com',
           username: 'testuser',
+          ref: 'testuser',
           name: 'Test User',
           status: 'active'
         },
         'finaltest@example.com': {
           email: 'finaltest@example.com', 
           username: 'finaltest',
+          ref: 'finaltest',
           name: 'Final Test',
           status: 'active'
         }
@@ -74,16 +79,37 @@ export default async function handler(req, res) {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const tokenExpiry = Date.now() + TOKEN_EXPIRY;
 
-    // Sla token op (in productie: in database)
-    resetTokens.set(resetToken, {
-      email: influencer.email,
-      username: influencer.username || influencer.ref,
-      name: influencer.name,
-      expiry: tokenExpiry,
-      used: false
-    });
+    console.log('🎫 Generated reset token for:', influencer.username || influencer.ref);
 
-    console.log('🎫 Generated reset token for:', influencer.username);
+    // Sla token op in database (met fallback naar in-memory voor development)
+    const tokenSaveResult = await saveResetToken(
+      resetToken,
+      influencer.email,
+      influencer.username || influencer.ref,
+      influencer.name,
+      tokenExpiry
+    );
+
+    // Als database niet beschikbaar is, gebruik in-memory fallback
+    if (!tokenSaveResult.success && !tokenSaveResult.fallback) {
+      console.log('⚠️  Database token save failed, using in-memory fallback');
+      resetTokens.set(resetToken, {
+        email: influencer.email,
+        username: influencer.username || influencer.ref,
+        name: influencer.name,
+        expiry: tokenExpiry,
+        used: false
+      });
+    } else if (tokenSaveResult.fallback) {
+      // Development mode - gebruik in-memory
+      resetTokens.set(resetToken, {
+        email: influencer.email,
+        username: influencer.username || influencer.ref,
+        name: influencer.name,
+        expiry: tokenExpiry,
+        used: false
+      });
+    }
 
     // Verstuur reset email (met fallback voor development)
     let emailResult = { success: false };
@@ -116,7 +142,7 @@ export default async function handler(req, res) {
       console.log('✅ Password reset email sent to:', email);
     }
 
-    // Cleanup oude tokens (simpele garbage collection)
+    // Cleanup oude in-memory tokens (als we die gebruiken)
     const now = Date.now();
     for (const [token, data] of resetTokens.entries()) {
       if (data.expiry < now) {
@@ -133,7 +159,8 @@ export default async function handler(req, res) {
         token: resetToken,
         expiry: new Date(tokenExpiry).toISOString(),
         resetUrl: `http://localhost:3000/reset-password?token=${resetToken}`,
-        emailSent: emailResult.success
+        emailSent: emailResult.success,
+        tokenStorage: tokenSaveResult.fallback ? 'in-memory' : 'database'
       } : undefined
     });
 
@@ -154,5 +181,5 @@ export default async function handler(req, res) {
   }
 }
 
-// Export reset tokens voor gebruik in reset-password API
+// Export reset tokens voor gebruik in reset-password API (fallback)
 export { resetTokens }; 
