@@ -38,6 +38,15 @@ export default async function handler(req, res) {
     `;
     console.log('✅ Influencers table created/verified');
 
+    // Ensure password column exists (for existing databases)
+    try {
+      await sql`ALTER TABLE influencers ADD COLUMN IF NOT EXISTS password VARCHAR(255)`;
+      console.log('✅ Password column ensured in influencers table');
+    } catch (error) {
+      // Column might already exist, that's fine
+      console.log('ℹ️  Password column already exists or error adding it:', error.message);
+    }
+
     // Create system_settings table
     await sql`
       CREATE TABLE IF NOT EXISTS system_settings (
