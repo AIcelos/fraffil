@@ -1,5 +1,5 @@
 const { getAllInfluencers, createInfluencer } = require('../../../lib/database.js');
-import bcrypt from 'bcryptjs';
+const bcrypt = require('bcryptjs');
 
 export default async function handler(req, res) {
   // CORS headers
