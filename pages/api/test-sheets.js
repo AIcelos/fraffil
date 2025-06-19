@@ -87,9 +87,9 @@ export default async function handler(req, res) {
     const uniqueInfluencers = [...new Set(sampleData.map(row => row.ref).filter(Boolean))];
     console.log('👥 Found influencers:', uniqueInfluencers);
     
-    // Test stats calculation
-    console.log('🧮 Testing stats calculation...');
-    const testStats = await googleSheetsService.getInfluencerStats('annemieke');
+    // Test stats calculation for finaltest instead of annemieke
+    console.log('🧮 Testing stats calculation for finaltest...');
+    const testStats = await googleSheetsService.getInfluencerStats('finaltest');
 
     return res.status(200).json({
       success: true,

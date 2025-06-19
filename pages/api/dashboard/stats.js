@@ -1,4 +1,5 @@
 import { sql } from '@vercel/postgres';
+import googleSheetsService from '../../../lib/googleSheets';
 
 export default async function handler(req, res) {
   // CORS headers
@@ -46,35 +47,58 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Account is inactive' });
     }
 
-    // For now, return basic stats with mock data
-    // In the future, connect to actual sales/orders system
+    // Get real stats from Google Sheets
+    let googleSheetsStats = null;
+    try {
+      console.log('📊 Fetching Google Sheets data for:', targetUser);
+      googleSheetsStats = await googleSheetsService.getInfluencerStats(targetUser);
+      console.log('✅ Google Sheets data retrieved:', googleSheetsStats);
+    } catch (error) {
+      console.error('⚠️ Google Sheets error:', error);
+      // Continue with fallback data
+    }
+
+    // Calculate commission based on real data
+    const commissionRate = influencerData.commission || 6.0;
+    const totalRevenue = googleSheetsStats?.totalRevenue || 0;
+    const totalCommission = (totalRevenue * commissionRate) / 100;
+
+    // Build stats object with real data
     const stats = {
-      totalSales: 0,
-      totalRevenue: 0,
-      totalCommission: 0,
-      recentOrders: [],
-      lastSale: null,
-      commissionRate: influencerData.commission || 6.0,
+      totalSales: googleSheetsStats?.totalSales || 0,
+      totalRevenue: totalRevenue,
+      totalCommission: totalCommission,
+      avgOrderValue: googleSheetsStats?.avgOrderValue || 0,
+      recentOrders: googleSheetsStats?.recentOrders || [],
+      lastSale: googleSheetsStats?.lastSale || null,
+      commissionRate: commissionRate,
       accountStatus: influencerData.status,
       memberSince: influencerData.created_at,
-      // Mock performance data
+      // Calculate monthly stats
+      monthlyStats: googleSheetsStats?.monthlyStats || {},
+      // Current month stats
       thisMonth: {
-        sales: 0,
+        sales: 0, // TODO: Calculate from monthly stats
         revenue: 0,
         commission: 0
       },
       lastMonth: {
-        sales: 0,
+        sales: 0, // TODO: Calculate from monthly stats  
         revenue: 0,
         commission: 0
       }
     };
 
-    console.log('✅ Dashboard stats calculated for:', targetUser);
+    console.log('✅ Dashboard stats calculated for:', targetUser, {
+      totalSales: stats.totalSales,
+      totalRevenue: stats.totalRevenue.toFixed(2),
+      totalCommission: stats.totalCommission.toFixed(2),
+      dataSource: googleSheetsStats ? 'Google Sheets' : 'fallback'
+    });
 
     res.status(200).json({
       success: true,
-      stats: stats,
+      data: stats,
       influencer: {
         name: influencerData.name,
         email: influencerData.email,
@@ -82,6 +106,7 @@ export default async function handler(req, res) {
         commission: influencerData.commission,
         status: influencerData.status
       },
+      dataSource: googleSheetsStats ? 'Google Sheets' : 'fallback',
       lastUpdated: new Date().toISOString()
     });
 
