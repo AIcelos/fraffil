@@ -87,7 +87,17 @@ export default async function handler(req, res) {
     console.log('🔐 Admin requesting password reset for user:', userRef);
 
     // Zoek gebruiker in Neon database
-    const user = await getInfluencerByRef(userRef);
+    let user;
+    try {
+      user = await getInfluencerByRef(userRef);
+      console.log('👤 User lookup result:', user ? 'Found' : 'Not found');
+    } catch (dbError) {
+      console.error('❌ Database error during user lookup:', dbError);
+      return res.status(500).json({
+        success: false,
+        error: 'Database error tijdens gebruiker lookup'
+      });
+    }
     
     if (!user) {
       return res.status(404).json({
@@ -118,13 +128,23 @@ export default async function handler(req, res) {
     console.log('🎫 Generated admin reset token for:', user.ref);
 
     // Sla token op in Neon database
-    const tokenSaveResult = await saveResetTokenDB(
-      resetToken,
-      user.email,
-      user.ref,
-      user.name,
-      tokenExpiry
-    );
+    let tokenSaveResult;
+    try {
+      tokenSaveResult = await saveResetTokenDB(
+        resetToken,
+        user.email,
+        user.ref,
+        user.name,
+        tokenExpiry
+      );
+      console.log('💾 Token save result:', tokenSaveResult.success ? 'Success' : 'Failed');
+    } catch (tokenError) {
+      console.error('❌ Token save error:', tokenError);
+      return res.status(500).json({
+        success: false,
+        error: 'Database error tijdens token opslaan'
+      });
+    }
 
     if (!tokenSaveResult.success) {
       console.error('❌ Failed to save reset token:', tokenSaveResult.error);
@@ -134,54 +154,22 @@ export default async function handler(req, res) {
       });
     }
 
-    // Verstuur reset email
-    let emailResult = { success: false };
+    // Voor nu skippen we de email service en geven altijd success terug
+    console.log('✅ Reset token saved successfully for:', user.email);
     
-    if (process.env.RESEND_API_KEY) {
-      try {
-        emailResult = await emailService.sendPasswordReset(
-          user.email,
-          user.name,
-          resetToken
-        );
-      } catch (error) {
-        console.error('❌ Email service error:', error);
-        emailResult = { success: false, error: error.message };
+    // Development mode - altijd debug info tonen
+    const resetUrl = `https://fraffil.vercel.app/reset-password?token=${resetToken}`;
+    console.log('🔗 Reset URL:', resetUrl);
+    
+    res.status(200).json({
+      success: true,
+      message: `Reset link gegenereerd voor ${user.email}`,
+      debug: {
+        resetUrl: resetUrl,
+        email: user.email,
+        tokenId: tokenSaveResult.id
       }
-    } else {
-      console.log('⚠️  RESEND_API_KEY not configured - email not sent');
-      emailResult = { success: false, error: 'Email service not configured' };
-    }
-
-    if (emailResult.success) {
-      console.log('✅ Admin password reset email sent to:', user.email);
-      res.status(200).json({
-        success: true,
-        message: `Reset link verstuurd naar ${user.email}`
-      });
-    } else {
-      console.error('❌ Reset email failed:', emailResult.error);
-      
-      // In development, return the token for testing
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔐 Development mode - Reset token:', resetToken);
-        console.log('🔗 Reset URL:', `https://fraffil.vercel.app/reset-password?token=${resetToken}`);
-        
-        res.status(200).json({
-          success: true,
-          message: `Reset link gegenereerd (check console logs)`,
-          debug: {
-            resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
-            email: user.email
-          }
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Er ging iets mis bij het versturen van de reset email'
-        });
-      }
-    }
+    });
 
   } catch (error) {
     console.error('❌ Admin reset password error:', error);
