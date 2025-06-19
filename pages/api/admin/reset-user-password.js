@@ -1,9 +1,55 @@
-import { getInfluencer, saveResetToken } from '../../../lib/database.js';
+import { sql } from '@vercel/postgres';
 import { emailService } from '../../../lib/email.js';
 import crypto from 'crypto';
 
 // Token geldigheid: 1 uur
 const TOKEN_EXPIRY = 60 * 60 * 1000;
+
+// Database functions using ES6 and @vercel/postgres
+async function getInfluencerByRef(ref) {
+  try {
+    const result = await sql`
+      SELECT ref, name, email, status
+      FROM influencers 
+      WHERE ref = ${ref}
+      LIMIT 1
+    `;
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching influencer:', error);
+    return null;
+  }
+}
+
+async function saveResetTokenDB(resetToken, email, userRef, userName, tokenExpiry) {
+  try {
+    // Create reset_tokens table if it doesn't exist
+    await sql`
+      CREATE TABLE IF NOT EXISTS reset_tokens (
+        id SERIAL PRIMARY KEY,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        user_ref VARCHAR(100) NOT NULL,
+        user_name VARCHAR(255),
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    // Save reset token
+    const result = await sql`
+      INSERT INTO reset_tokens (token, email, user_ref, user_name, expires_at)
+      VALUES (${resetToken}, ${email}, ${userRef}, ${userName}, ${new Date(tokenExpiry).toISOString()})
+      RETURNING id
+    `;
+
+    return { success: true, id: result.rows[0].id };
+  } catch (error) {
+    console.error('Error saving reset token:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 export default async function handler(req, res) {
   // CORS headers
@@ -40,8 +86,8 @@ export default async function handler(req, res) {
 
     console.log('🔐 Admin requesting password reset for user:', userRef);
 
-    // Zoek gebruiker
-    const user = await getInfluencer(userRef);
+    // Zoek gebruiker in Neon database
+    const user = await getInfluencerByRef(userRef);
     
     if (!user) {
       return res.status(404).json({
@@ -71,8 +117,8 @@ export default async function handler(req, res) {
 
     console.log('🎫 Generated admin reset token for:', user.ref);
 
-    // Sla token op in database
-    const tokenSaveResult = await saveResetToken(
+    // Sla token op in Neon database
+    const tokenSaveResult = await saveResetTokenDB(
       resetToken,
       user.email,
       user.ref,
@@ -80,8 +126,8 @@ export default async function handler(req, res) {
       tokenExpiry
     );
 
-    if (!tokenSaveResult.success && !tokenSaveResult.fallback) {
-      console.error('❌ Failed to save reset token');
+    if (!tokenSaveResult.success) {
+      console.error('❌ Failed to save reset token:', tokenSaveResult.error);
       return res.status(500).json({
         success: false,
         error: 'Er ging iets mis bij het genereren van de reset link'
