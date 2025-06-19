@@ -1,5 +1,5 @@
 import googleSheetsService from '../../../lib/googleSheets';
-import { getAllInfluencers } from '../../../lib/database.js';
+const { getAllInfluencers } = require('../../../lib/database.js');
 
 export default async function handler(req, res) {
   // CORS headers
