@@ -15,32 +15,34 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { username } = req.query;
+  // Accept both 'username' and 'influencer' parameters for compatibility
+  const { username, influencer } = req.query;
+  const targetUser = username || influencer;
 
-  if (!username) {
-    return res.status(400).json({ error: 'Username is required' });
+  if (!targetUser) {
+    return res.status(400).json({ error: 'Username or influencer parameter is required' });
   }
 
   try {
-    console.log('📊 Dashboard stats request for:', username);
+    console.log('📊 Dashboard stats request for:', targetUser);
 
     // Get influencer info from database
     const result = await sql`
       SELECT ref, name, email, commission, status, created_at
       FROM influencers 
-      WHERE ref = ${username.toLowerCase()}
+      WHERE ref = ${targetUser.toLowerCase()}
       LIMIT 1
     `;
     
-    const influencer = result.rows[0];
+    const influencerData = result.rows[0];
     
-    if (!influencer) {
-      console.log('❌ Influencer not found:', username);
+    if (!influencerData) {
+      console.log('❌ Influencer not found:', targetUser);
       return res.status(404).json({ error: 'Influencer not found' });
     }
 
-    if (influencer.status !== 'active') {
-      console.log('❌ Inactive influencer:', username);
+    if (influencerData.status !== 'active') {
+      console.log('❌ Inactive influencer:', targetUser);
       return res.status(403).json({ error: 'Account is inactive' });
     }
 
@@ -52,9 +54,9 @@ export default async function handler(req, res) {
       totalCommission: 0,
       recentOrders: [],
       lastSale: null,
-      commissionRate: influencer.commission || 6.0,
-      accountStatus: influencer.status,
-      memberSince: influencer.created_at,
+      commissionRate: influencerData.commission || 6.0,
+      accountStatus: influencerData.status,
+      memberSince: influencerData.created_at,
       // Mock performance data
       thisMonth: {
         sales: 0,
@@ -68,17 +70,17 @@ export default async function handler(req, res) {
       }
     };
 
-    console.log('✅ Dashboard stats calculated for:', username);
+    console.log('✅ Dashboard stats calculated for:', targetUser);
 
     res.status(200).json({
       success: true,
       stats: stats,
       influencer: {
-        name: influencer.name,
-        email: influencer.email,
-        username: influencer.ref,
-        commission: influencer.commission,
-        status: influencer.status
+        name: influencerData.name,
+        email: influencerData.email,
+        username: influencerData.ref,
+        commission: influencerData.commission,
+        status: influencerData.status
       },
       lastUpdated: new Date().toISOString()
     });
