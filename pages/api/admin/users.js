@@ -1,7 +1,7 @@
-const { getAllInfluencers, createInfluencer } = require('../../../lib/database.js');
-const bcrypt = require('bcryptjs');
+import { sql } from '@vercel/postgres';
+import bcrypt from 'bcryptjs';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Simple admin authentication (in productie: gebruik JWT tokens)
+  // Simple admin authentication
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
@@ -23,14 +23,22 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       // Haal alle gebruikers op
-      console.log('📋 Admin requesting all users');
+      console.log('📋 Admin requesting all users from database');
       
-      const users = await getAllInfluencers();
+      const result = await sql`
+        SELECT ref, name, email, phone, instagram, tiktok, youtube,
+               commission, status, notes, created_at, updated_at
+        FROM influencers 
+        ORDER BY created_at DESC
+      `;
+      
+      const users = result.rows;
+      console.log(`📋 Admin requesting all users from database - found: ${users.length}`);
       
       res.status(200).json({
         success: true,
-        users: users || [],
-        count: users?.length || 0
+        users: users,
+        count: users.length
       });
 
     } else if (req.method === 'POST') {
@@ -54,35 +62,48 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      // Maak gebruiker aan (password wordt gehashed in createInfluencer)
-      const result = await createInfluencer({
-        ref: userData.ref,
-        name: userData.name,
-        email: userData.email.toLowerCase(),
-        phone: userData.phone || '',
-        instagram: userData.instagram || '',
-        tiktok: userData.tiktok || '',
-        youtube: userData.youtube || '',
-        commission: parseFloat(userData.commission) || 6.00,
-        status: userData.status || 'active',
-        notes: userData.notes || '',
-        password: userData.password // Plain text - wordt gehashed in createInfluencer
-      });
+      // Check if user already exists
+      const existingUser = await sql`
+        SELECT ref, email FROM influencers 
+        WHERE ref = ${userData.ref} OR email = ${userData.email.toLowerCase()}
+      `;
 
-      if (result.success) {
-        console.log('✅ User created successfully:', userData.ref);
-        res.status(201).json({
-          success: true,
-          message: `Gebruiker ${userData.ref} succesvol aangemaakt`,
-          user: result.data
-        });
-      } else {
-        console.error('❌ Failed to create user:', result.error);
-        res.status(400).json({
+      if (existingUser.rows.length > 0) {
+        const existing = existingUser.rows[0];
+        const field = existing.ref === userData.ref ? 'username' : 'email';
+        return res.status(400).json({
           success: false,
-          error: result.error
+          error: `${field} bestaat al`
         });
       }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(userData.password, 12);
+      
+      // Create user
+      const result = await sql`
+        INSERT INTO influencers (
+          ref, name, email, phone, instagram, tiktok, youtube,
+          commission, status, notes, password, created_at
+        ) VALUES (
+          ${userData.ref}, ${userData.name}, ${userData.email.toLowerCase()}, 
+          ${userData.phone || ''}, ${userData.instagram || ''}, 
+          ${userData.tiktok || ''}, ${userData.youtube || ''}, 
+          ${parseFloat(userData.commission) || 6.00}, 
+          ${userData.status || 'active'}, ${userData.notes || ''}, 
+          ${hashedPassword}, NOW()
+        )
+        RETURNING ref, name, email, commission, status, created_at
+      `;
+
+      const newUser = result.rows[0];
+      console.log('✅ User created successfully:', newUser.ref);
+
+      res.status(201).json({
+        success: true,
+        message: `Gebruiker ${newUser.ref} succesvol aangemaakt`,
+        user: newUser
+      });
 
     } else {
       res.status(405).json({
@@ -93,6 +114,14 @@ module.exports = async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Admin users API error:', error);
+    
+    if (error.message.includes('duplicate key') || error.message.includes('already exists')) {
+      const field = error.message.includes('email') ? 'email' : 'username';
+      return res.status(400).json({
+        success: false,
+        error: `${field} bestaat al`
+      });
+    }
     
     res.status(500).json({
       success: false,

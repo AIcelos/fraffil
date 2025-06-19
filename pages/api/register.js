@@ -1,5 +1,6 @@
-import { createInfluencer } from '../../lib/database.js';
+import { sql } from '@vercel/postgres';
 import { emailService } from '../../lib/email.js';
+import bcrypt from 'bcryptjs';
 
 // Functie om een tijdelijk wachtwoord te genereren
 function generateTempPassword() {
@@ -21,6 +22,76 @@ function isValidEmail(email) {
 function isValidUsername(username) {
   const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
   return usernameRegex.test(username);
+}
+
+// Create influencer in database
+async function createInfluencerDB(data) {
+  try {
+    console.log('🔍 Creating influencer with data:', {
+      ref: data.ref,
+      email: data.email,
+      name: data.name,
+      hasPassword: !!data.password
+    });
+
+    // Check if username or email already exists
+    const existingUser = await sql`
+      SELECT ref, email FROM influencers 
+      WHERE ref = ${data.ref} OR email = ${data.email}
+    `;
+
+    if (existingUser.rows.length > 0) {
+      const existing = existingUser.rows[0];
+      const field = existing.ref === data.ref ? 'username' : 'email';
+      return { 
+        success: false, 
+        error: `${field} already exists` 
+      };
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+    console.log('🔐 Password hashed for user:', data.ref);
+
+    // Create influencer
+    const result = await sql`
+      INSERT INTO influencers (
+        ref, name, email, phone, instagram, tiktok, youtube,
+        commission, status, notes, password, created_at
+      ) VALUES (
+        ${data.ref}, ${data.name || ''}, ${data.email || ''}, 
+        ${data.phone || ''}, ${data.instagram || ''}, ${data.tiktok || ''}, 
+        ${data.youtube || ''}, ${data.commission || 6.00}, 
+        ${data.status || 'active'}, ${data.notes || ''}, 
+        ${hashedPassword}, NOW()
+      )
+      RETURNING ref, name, email, commission, status
+    `;
+
+    const newInfluencer = result.rows[0];
+    console.log('✅ Influencer created:', newInfluencer.ref);
+
+    return { 
+      success: true, 
+      influencer: newInfluencer 
+    };
+
+  } catch (error) {
+    console.error('❌ Database error creating influencer:', error);
+    
+    if (error.message.includes('duplicate key') || error.message.includes('already exists')) {
+      const field = error.message.includes('email') ? 'email' : 'username';
+      return { 
+        success: false, 
+        error: `${field} already exists` 
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
 }
 
 export default async function handler(req, res) {
@@ -86,15 +157,11 @@ export default async function handler(req, res) {
       tiktok: tiktok?.trim() || null,
       youtube: youtube?.trim() || null,
       website: website?.trim() || null,
-      password: tempPassword, // Will be hashed in database function
-      commission: 6.0, // Default commission rate
+      password: tempPassword,
+      commission: 6.0,
       status: 'active',
       referredBy: referredBy?.trim() || null,
-      registrationDate: new Date().toISOString(),
-      lastLogin: null,
-      totalSales: 0,
-      totalRevenue: 0.0,
-      totalCommission: 0.0
+      notes: referredBy ? `Referred by: ${referredBy.trim()}` : null
     };
 
     console.log('👤 Creating new influencer:', {
@@ -104,7 +171,7 @@ export default async function handler(req, res) {
     });
 
     // Create influencer in database
-    const dbResult = await createInfluencer(influencerData);
+    const dbResult = await createInfluencerDB(influencerData);
     
     if (!dbResult.success) {
       if (dbResult.error.includes('already exists') || dbResult.error.includes('duplicate')) {
