@@ -75,10 +75,57 @@ async function createInfluencerDB(data) {
   }
 }
 
+async function updateInfluencerDB(data) {
+  try {
+    console.log('🔍 Updating influencer with data:', {
+      ref: data.ref,
+      email: data.email,
+      name: data.name
+    });
+
+    // Update influencer
+    const result = await sql`
+      UPDATE influencers SET
+        name = ${data.name || ''},
+        email = ${data.email || ''},
+        phone = ${data.phone || ''},
+        instagram = ${data.instagram || ''},
+        tiktok = ${data.tiktok || ''},
+        youtube = ${data.youtube || ''},
+        commission = ${data.commission || 6.00},
+        status = ${data.status || 'active'},
+        notes = ${data.notes || ''},
+        updated_at = NOW()
+      WHERE ref = ${data.ref}
+      RETURNING *
+    `;
+
+    if (result.rows.length === 0) {
+      return { 
+        success: false, 
+        error: 'Gebruiker niet gevonden' 
+      };
+    }
+
+    console.log('✅ Influencer updated successfully:', data.ref);
+    return { 
+      success: true, 
+      data: result.rows[0] 
+    };
+
+  } catch (error) {
+    console.error('❌ Error updating influencer:', error);
+    return { 
+      success: false, 
+      error: 'Database error: ' + error.message 
+    };
+  }
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -135,6 +182,38 @@ export default async function handler(req, res) {
         });
       } else {
         console.error('❌ Failed to create user:', result.error);
+        res.status(400).json({
+          success: false,
+          error: result.error
+        });
+      }
+
+    } else if (req.method === 'PUT') {
+      // Update user in database
+      const userData = req.body;
+      
+      console.log('👤 Admin updating user in database:', userData.ref);
+
+      // Basic validation
+      if (!userData.ref || !userData.name || !userData.email) {
+        return res.status(400).json({
+          success: false,
+          error: 'Username, naam en email zijn verplicht'
+        });
+      }
+
+      // Update user in database
+      const result = await updateInfluencerDB(userData);
+      
+      if (result.success) {
+        console.log('✅ User updated in database:', userData.ref);
+        res.status(200).json({
+          success: true,
+          message: `Gebruiker ${userData.ref} succesvol bijgewerkt in Neon PostgreSQL database!`,
+          user: result.data
+        });
+      } else {
+        console.error('❌ Failed to update user:', result.error);
         res.status(400).json({
           success: false,
           error: result.error
