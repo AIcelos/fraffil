@@ -7,7 +7,8 @@ const TOKEN_EXPIRY = 60 * 60 * 1000;
 // Save reset token in database
 async function saveResetToken(resetToken, email, userRef, userName, tokenExpiry) {
   try {
-    // Create reset_tokens table if it doesn't exist
+    // First, ensure the table exists
+    console.log('🔧 Creating reset_tokens table if not exists...');
     await sql`
       CREATE TABLE IF NOT EXISTS reset_tokens (
         id SERIAL PRIMARY KEY,
@@ -20,17 +21,25 @@ async function saveResetToken(resetToken, email, userRef, userName, tokenExpiry)
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
+    console.log('✅ Table creation completed');
 
-    // Save reset token
+    // Then save the reset token
+    console.log('💾 Saving reset token...');
     const result = await sql`
       INSERT INTO reset_tokens (token, email, user_ref, user_name, expires_at)
-      VALUES (${resetToken}, ${email}, ${userRef}, ${userName}, ${new Date(tokenExpiry).toISOString()})
+      VALUES (${resetToken}, ${email}, ${userRef}, ${userName || ''}, ${new Date(tokenExpiry).toISOString()})
       RETURNING id
     `;
+    console.log('✅ Token saved with ID:', result.rows[0].id);
 
     return { success: true, id: result.rows[0].id };
   } catch (error) {
-    console.error('❌ Error saving reset token:', error);
+    console.error('❌ Error in saveResetToken:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
     return { success: false, error: error.message };
   }
 }
