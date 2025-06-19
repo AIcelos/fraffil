@@ -41,6 +41,9 @@ export default function AdminDashboard() {
           if (usersData.success) {
             const users = usersData.users || [];
             
+            console.log('🔍 Dashboard: Raw users data:', users);
+            console.log('🔍 Dashboard: Users count:', users.length);
+            
             // Calculate stats from database users
             const stats = {
               totalRevenue: 0, // TODO: Connect to Google Sheets for order data
@@ -55,7 +58,7 @@ export default function AdminDashboard() {
                 recentOrders: [],   // TODO: Connect to Google Sheets
                 email: user.email || '',
                 phone: user.phone || '',
-                commission: user.commission || 6.00,
+                commission: parseFloat(user.commission) || 6.00,
                 status: user.status || 'active',
                 instagram: user.instagram || '',
                 tiktok: user.tiktok || '',
@@ -65,6 +68,9 @@ export default function AdminDashboard() {
                 created_at: user.created_at
               }))
             };
+            
+            console.log('🔍 Transformed stats:', stats);
+            console.log('🔍 Influencers array:', stats.influencers);
             
             setSystemStats(stats);
             setInfluencers(stats.influencers);
