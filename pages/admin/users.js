@@ -37,22 +37,53 @@ export default function UserManager() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/users-production', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
       
-      const data = await response.json();
-      if (data.success) {
-        setUsers(data.users || []);
-        setError(''); // Clear any previous errors
-      } else {
-        setError(data.error || 'Failed to load users');
+      // Try production API first
+      try {
+        const response = await fetch('/api/admin/users-production', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setUsers(data.users || []);
+            setError(''); // Clear any previous errors
+            console.log('✅ Users loaded from production database');
+            return;
+          }
+        }
+      } catch (prodError) {
+        console.log('⚠️ Production API failed, trying fallback:', prodError.message);
       }
+      
+      // Fallback to memory-based API
+      try {
+        const response = await fetch('/api/admin/users-fallback', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          setUsers(data.users || []);
+          setError(''); // Clear any previous errors
+          console.log('✅ Users loaded from fallback API (no database)');
+          return;
+        } else {
+          setError(data.error || 'Failed to load users');
+        }
+      } catch (fallbackError) {
+        console.error('❌ Both APIs failed:', fallbackError);
+        setError('Alle API\'s zijn niet beschikbaar - probeer later opnieuw');
+      }
+      
     } catch (error) {
       console.error('Load users error:', error);
-      setError('Network error loading users - check database connection');
+      setError('Network error loading users - check connection');
     } finally {
       setLoading(false);
     }
@@ -64,31 +95,69 @@ export default function UserManager() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/admin/users-production', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        },
-        body: JSON.stringify(newUser)
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt!`);
-        setNewUser({
-          ref: '', name: '', email: '', phone: '', instagram: '', 
-          tiktok: '', youtube: '', commission: '6.00', status: 'active', 
-          notes: '', password: ''
+      // Try production API first
+      let response, data;
+      
+      try {
+        response = await fetch('/api/admin/users-production', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          },
+          body: JSON.stringify(newUser)
         });
-        setShowCreateForm(false);
-        loadUsers(); // Reload to show new user
-      } else {
-        setError(data.error || 'Failed to create user');
+
+        if (response.ok) {
+          data = await response.json();
+          if (data.success) {
+            setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt in database!`);
+            setNewUser({
+              ref: '', name: '', email: '', phone: '', instagram: '', 
+              tiktok: '', youtube: '', commission: '6.00', status: 'active', 
+              notes: '', password: ''
+            });
+            setShowCreateForm(false);
+            loadUsers(); // Reload to show new user
+            return;
+          }
+        }
+      } catch (prodError) {
+        console.log('⚠️ Production API failed for create, trying fallback:', prodError.message);
       }
+
+      // Fallback to memory-based API
+      try {
+        response = await fetch('/api/admin/users-fallback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          },
+          body: JSON.stringify(newUser)
+        });
+
+        data = await response.json();
+        if (data.success) {
+          setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt (fallback mode)!`);
+          setNewUser({
+            ref: '', name: '', email: '', phone: '', instagram: '', 
+            tiktok: '', youtube: '', commission: '6.00', status: 'active', 
+            notes: '', password: ''
+          });
+          setShowCreateForm(false);
+          loadUsers(); // Reload to show new user
+        } else {
+          setError(data.error || 'Failed to create user');
+        }
+      } catch (fallbackError) {
+        console.error('❌ Both create APIs failed:', fallbackError);
+        setError('Alle API\'s zijn niet beschikbaar - probeer later opnieuw');
+      }
+
     } catch (error) {
       console.error('Create user error:', error);
-      setError('Network error creating user - check database connection');
+      setError('Network error creating user - check connection');
     }
   };
 
