@@ -262,6 +262,16 @@ export default function AdminDashboard() {
                   </svg>
                   Email
                 </button>
+                <button
+                  onClick={() => router.push('/admin/bulk-operations')}
+                  className="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium"
+                  title="Bulk Operations"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Bulk
+                </button>
                 
                 {/* Divider */}
                 <div className="h-6 w-px bg-gray-600 mx-2"></div>
