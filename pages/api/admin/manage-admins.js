@@ -37,34 +37,17 @@ async function ensureAdminUsersTable() {
   }
 }
 
-// Get all admin users - FIXED: Handle missing columns gracefully
+// Get all admin users - FIXED: Use simple query instead of sql.unsafe
 async function getAllAdmins() {
   try {
-    // First check what columns exist
-    const tableInfo = await sql`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'admin_users'
+    // Since we know all columns exist now, use simple query
+    const result = await sql`
+      SELECT id, username, email, role, status, created_at, created_by, last_login, notes
+      FROM admin_users 
+      ORDER BY created_at DESC
     `;
     
-    const columns = tableInfo.rows.map(row => row.column_name);
-    console.log('📊 Available columns:', columns);
-
-    // Build query based on available columns
-    let query = `SELECT id, username, password_hash, created_at`;
-    
-    if (columns.includes('email')) query += `, email`;
-    if (columns.includes('role')) query += `, role`;
-    if (columns.includes('status')) query += `, status`;
-    if (columns.includes('created_by')) query += `, created_by`;
-    if (columns.includes('last_login')) query += `, last_login`;
-    if (columns.includes('notes')) query += `, notes`;
-    
-    query += ` FROM admin_users ORDER BY created_at DESC`;
-
-    const result = await sql.unsafe(query);
-    
-    // Fill in missing fields with defaults
+    // Fill in missing fields with defaults for safety
     const admins = result.rows.map(admin => ({
       id: admin.id,
       username: admin.username,
@@ -105,7 +88,7 @@ async function createAdmin(adminData, createdBy) {
       return { success: false, error: 'Username bestaat al' };
     }
 
-    // Check if email already exists (if provided and column exists)
+    // Check if email already exists (if provided)
     if (email) {
       try {
         const existingEmail = await sql`
@@ -125,32 +108,17 @@ async function createAdmin(adminData, createdBy) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create admin user - use basic insert first
+    // Create admin user with all fields at once
     const result = await sql`
-      INSERT INTO admin_users (username, password_hash) 
-      VALUES (${username.toLowerCase()}, ${hashedPassword}) 
-      RETURNING id, username, created_at
+      INSERT INTO admin_users (
+        username, password_hash, email, role, status, created_by, notes
+      ) VALUES (
+        ${username.toLowerCase()}, ${hashedPassword}, ${email?.toLowerCase() || null}, 
+        ${role}, 'active', ${createdBy}, ${notes}
+      ) RETURNING id, username, email, role, status, created_at, created_by
     `;
 
     const newAdmin = result.rows[0];
-
-    // Try to update with additional fields if columns exist
-    if (email || role !== 'admin' || notes || createdBy) {
-      try {
-        await sql`
-          UPDATE admin_users 
-          SET email = ${email?.toLowerCase() || null},
-              role = ${role},
-              status = 'active',
-              created_by = ${createdBy},
-              notes = ${notes}
-          WHERE id = ${newAdmin.id}
-        `;
-      } catch (updateError) {
-        console.log('⚠️ Could not update additional fields:', updateError.message);
-      }
-    }
-
     console.log('✅ Admin created:', newAdmin.username);
 
     return { success: true, data: newAdmin };
@@ -160,18 +128,22 @@ async function createAdmin(adminData, createdBy) {
   }
 }
 
-// Update admin user - SIMPLIFIED
+// Update admin user - FIXED: Use individual UPDATE statements instead of dynamic query
 async function updateAdmin(adminId, updateData, updatedBy) {
   try {
     const { username, email, role, status, notes, newPassword } = updateData;
 
-    // Start with basic fields that should always exist
-    let updates = [];
-    let values = [];
-    let paramCount = 0;
+    // Check if admin exists first
+    const existingAdmin = await sql`
+      SELECT id, username FROM admin_users WHERE id = ${adminId} LIMIT 1
+    `;
 
+    if (existingAdmin.rows.length === 0) {
+      return { success: false, error: 'Admin niet gevonden' };
+    }
+
+    // Update username if provided
     if (username) {
-      // Check if new username is available
       const existingUser = await sql`
         SELECT id FROM admin_users 
         WHERE username = ${username.toLowerCase()} AND id != ${adminId}
@@ -180,55 +152,67 @@ async function updateAdmin(adminId, updateData, updatedBy) {
       if (existingUser.rows.length > 0) {
         return { success: false, error: 'Username is al in gebruik' };
       }
-      updates.push(`username = $${++paramCount}`);
-      values.push(username.toLowerCase());
+      
+      await sql`
+        UPDATE admin_users 
+        SET username = ${username.toLowerCase()}
+        WHERE id = ${adminId}
+      `;
     }
 
+    // Update password if provided
     if (newPassword) {
       const hashedPassword = await bcrypt.hash(newPassword, 12);
-      updates.push(`password_hash = $${++paramCount}`);
-      values.push(hashedPassword);
+      await sql`
+        UPDATE admin_users 
+        SET password_hash = ${hashedPassword}
+        WHERE id = ${adminId}
+      `;
     }
 
-    // Try to update optional fields
+    // Update email if provided
     if (email !== undefined) {
-      updates.push(`email = $${++paramCount}`);
-      values.push(email?.toLowerCase() || null);
+      await sql`
+        UPDATE admin_users 
+        SET email = ${email?.toLowerCase() || null}
+        WHERE id = ${adminId}
+      `;
     }
 
+    // Update role if provided
     if (role) {
-      updates.push(`role = $${++paramCount}`);
-      values.push(role);
+      await sql`
+        UPDATE admin_users 
+        SET role = ${role}
+        WHERE id = ${adminId}
+      `;
     }
 
+    // Update status if provided
     if (status) {
-      updates.push(`status = $${++paramCount}`);
-      values.push(status);
+      await sql`
+        UPDATE admin_users 
+        SET status = ${status}
+        WHERE id = ${adminId}
+      `;
     }
 
+    // Update notes if provided
     if (notes !== undefined) {
-      updates.push(`notes = $${++paramCount}`);
-      values.push(notes);
+      await sql`
+        UPDATE admin_users 
+        SET notes = ${notes}
+        WHERE id = ${adminId}
+      `;
     }
 
-    if (updates.length === 0) {
-      return { success: false, error: 'Geen velden om bij te werken' };
-    }
-
-    // Execute update
-    const query = `
-      UPDATE admin_users 
-      SET ${updates.join(', ')}
-      WHERE id = $${++paramCount}
-      RETURNING id, username, created_at
+    // Get updated admin data
+    const result = await sql`
+      SELECT id, username, email, role, status, created_at, created_by
+      FROM admin_users 
+      WHERE id = ${adminId}
+      LIMIT 1
     `;
-    values.push(adminId);
-
-    const result = await sql.unsafe(query, values);
-
-    if (result.rows.length === 0) {
-      return { success: false, error: 'Admin niet gevonden' };
-    }
 
     console.log('✅ Admin updated:', result.rows[0].username);
     return { success: true, data: result.rows[0] };
@@ -251,26 +235,20 @@ async function deleteAdmin(adminId, deletedBy) {
       return { success: false, error: 'Kan de laatste actieve admin niet verwijderen' };
     }
 
-    // Try soft delete first
-    try {
-      const result = await sql`
-        UPDATE admin_users 
-        SET status = 'inactive'
-        WHERE id = ${adminId}
-        RETURNING username
-      `;
+    // Soft delete by setting status to inactive
+    const result = await sql`
+      UPDATE admin_users 
+      SET status = 'inactive'
+      WHERE id = ${adminId}
+      RETURNING username
+    `;
 
-      if (result.rows.length === 0) {
-        return { success: false, error: 'Admin niet gevonden' };
-      }
-
-      console.log('✅ Admin deactivated:', result.rows[0].username);
-      return { success: true, data: result.rows[0] };
-    } catch (error) {
-      // If status column doesn't exist, we can't soft delete
-      console.log('⚠️ Cannot soft delete, status column missing');
-      return { success: false, error: 'Deactivatie niet mogelijk - database schema incomplete' };
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Admin niet gevonden' };
     }
+
+    console.log('✅ Admin deactivated:', result.rows[0].username);
+    return { success: true, data: result.rows[0] };
   } catch (error) {
     console.error('❌ Error deleting admin:', error);
     return { success: false, error: error.message };
