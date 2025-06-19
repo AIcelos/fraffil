@@ -37,53 +37,22 @@ export default function UserManager() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      
-      // Try production API first
-      try {
-        const response = await fetch('/api/admin/users-production', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setUsers(data.users || []);
-            setError(''); // Clear any previous errors
-            console.log('✅ Users loaded from production database');
-            return;
-          }
+      const response = await fetch('/api/admin/users-working', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
-      } catch (prodError) {
-        console.log('⚠️ Production API failed, trying fallback:', prodError.message);
-      }
+      });
       
-      // Fallback to memory-based API
-      try {
-        const response = await fetch('/api/admin/users-fallback', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-          }
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-          setUsers(data.users || []);
-          setError(''); // Clear any previous errors
-          console.log('✅ Users loaded from fallback API (no database)');
-          return;
-        } else {
-          setError(data.error || 'Failed to load users');
-        }
-      } catch (fallbackError) {
-        console.error('❌ Both APIs failed:', fallbackError);
-        setError('Alle API\'s zijn niet beschikbaar - probeer later opnieuw');
+      const data = await response.json();
+      if (data.success) {
+        setUsers(data.users || []);
+        setError(''); // Clear any previous errors
+      } else {
+        setError(data.error || 'Failed to load users');
       }
-      
     } catch (error) {
       console.error('Load users error:', error);
-      setError('Network error loading users - check connection');
+      setError('Network error loading users');
     } finally {
       setLoading(false);
     }
@@ -95,69 +64,31 @@ export default function UserManager() {
     setSuccess('');
 
     try {
-      // Try production API first
-      let response, data;
-      
-      try {
-        response = await fetch('/api/admin/users-production', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-          },
-          body: JSON.stringify(newUser)
+      const response = await fetch('/api/admin/users-working', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify(newUser)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt!`);
+        setNewUser({
+          ref: '', name: '', email: '', phone: '', instagram: '', 
+          tiktok: '', youtube: '', commission: '6.00', status: 'active', 
+          notes: '', password: ''
         });
-
-        if (response.ok) {
-          data = await response.json();
-          if (data.success) {
-            setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt in database!`);
-            setNewUser({
-              ref: '', name: '', email: '', phone: '', instagram: '', 
-              tiktok: '', youtube: '', commission: '6.00', status: 'active', 
-              notes: '', password: ''
-            });
-            setShowCreateForm(false);
-            loadUsers(); // Reload to show new user
-            return;
-          }
-        }
-      } catch (prodError) {
-        console.log('⚠️ Production API failed for create, trying fallback:', prodError.message);
+        setShowCreateForm(false);
+        loadUsers(); // Reload to show new user
+      } else {
+        setError(data.error || 'Failed to create user');
       }
-
-      // Fallback to memory-based API
-      try {
-        response = await fetch('/api/admin/users-fallback', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-          },
-          body: JSON.stringify(newUser)
-        });
-
-        data = await response.json();
-        if (data.success) {
-          setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt (fallback mode)!`);
-          setNewUser({
-            ref: '', name: '', email: '', phone: '', instagram: '', 
-            tiktok: '', youtube: '', commission: '6.00', status: 'active', 
-            notes: '', password: ''
-          });
-          setShowCreateForm(false);
-          loadUsers(); // Reload to show new user
-        } else {
-          setError(data.error || 'Failed to create user');
-        }
-      } catch (fallbackError) {
-        console.error('❌ Both create APIs failed:', fallbackError);
-        setError('Alle API\'s zijn niet beschikbaar - probeer later opnieuw');
-      }
-
     } catch (error) {
       console.error('Create user error:', error);
-      setError('Network error creating user - check connection');
+      setError('Network error creating user');
     }
   };
 
@@ -236,7 +167,7 @@ export default function UserManager() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Gebruikers laden uit database...</p>
+          <p className="text-gray-600">Gebruikers laden (in-memory)...</p>
         </div>
       </div>
     );
@@ -251,7 +182,7 @@ export default function UserManager() {
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">👥 Gebruikersbeheer</h1>
-                <p className="text-sm text-gray-600">Beheer influencers en hun accounts (PostgreSQL Database)</p>
+                <p className="text-sm text-gray-600">Beheer influencers en hun accounts (Tijdelijk: In-Memory Storage)</p>
               </div>
               <div className="flex space-x-3">
                 <button
