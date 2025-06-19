@@ -1,5 +1,4 @@
 import { sql } from '@vercel/postgres';
-import { emailService } from '../../../lib/email.js';
 import crypto from 'crypto';
 
 // Token geldigheid: 1 uur
