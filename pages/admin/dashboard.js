@@ -38,7 +38,7 @@ export default function AdminDashboard() {
       
       // Try to load system statistics, but fallback to local data
       try {
-        const statsResponse = await fetch('/api/admin/stats-basic');
+        const statsResponse = await fetch('/api/admin/stats-working');
         const statsData = await statsResponse.json();
         
         if (statsData.success) {

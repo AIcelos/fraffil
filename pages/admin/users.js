@@ -37,7 +37,7 @@ export default function UserManager() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/users-basic', {
+      const response = await fetch('/api/admin/users-working', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
@@ -62,7 +62,7 @@ export default function UserManager() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/admin/users-basic', {
+      const response = await fetch('/api/admin/users-working', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
