@@ -1,6 +1,51 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
 
+// Token geldigheid: 1 uur
+const TOKEN_EXPIRY = 60 * 60 * 1000;
+
+// Dynamic import van email service
+async function getEmailService() {
+  try {
+    const emailModule = await import('../../../lib/email.js');
+    return emailModule.emailService || emailModule.default;
+  } catch (error) {
+    console.error('❌ Failed to load email service:', error);
+    return null;
+  }
+}
+
+// Save reset token in database
+async function saveResetToken(resetToken, email, userRef, userName, tokenExpiry) {
+  try {
+    // Create reset_tokens table if it doesn't exist
+    await sql`
+      CREATE TABLE IF NOT EXISTS reset_tokens (
+        id SERIAL PRIMARY KEY,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        user_ref VARCHAR(100) NOT NULL,
+        user_name VARCHAR(255),
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    // Save reset token
+    const result = await sql`
+      INSERT INTO reset_tokens (token, email, user_ref, user_name, expires_at)
+      VALUES (${resetToken}, ${email}, ${userRef}, ${userName}, ${new Date(tokenExpiry).toISOString()})
+      RETURNING id
+    `;
+
+    return { success: true, id: result.rows[0].id };
+  } catch (error) {
+    console.error('❌ Error saving reset token:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,7 +81,7 @@ export default async function handler(req, res) {
 
     console.log('🔐 Admin requesting password reset for user:', userRef);
 
-    // Test database connection
+    // Database lookup
     try {
       const result = await sql`
         SELECT ref, name, email, status
@@ -62,22 +107,81 @@ export default async function handler(req, res) {
         });
       }
 
-      // Generate token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      console.log('🎫 Token generated');
+      // Check if account is active
+      if (user.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          error: 'Account is niet actief'
+        });
+      }
 
-      // For now, just return success without saving token
-      const resetUrl = `https://fraffil.vercel.app/reset-password?token=${resetToken}`;
+      // Generate secure reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpiry = Date.now() + TOKEN_EXPIRY;
+      console.log('🎫 Token generated for:', user.ref);
+
+      // Save token to database
+      const tokenSaveResult = await saveResetToken(
+        resetToken,
+        user.email,
+        user.ref,
+        user.name,
+        tokenExpiry
+      );
+
+      if (!tokenSaveResult.success) {
+        console.error('❌ Failed to save reset token:', tokenSaveResult.error);
+        return res.status(500).json({
+          success: false,
+          error: 'Er ging iets mis bij het genereren van de reset link'
+        });
+      }
+
+      console.log('💾 Token saved successfully with ID:', tokenSaveResult.id);
+
+      // Send reset email
+      let emailResult = { success: false };
+      const emailService = await getEmailService();
       
-      res.status(200).json({
-        success: true,
-        message: `Reset link gegenereerd voor ${user.email}`,
-        debug: {
-          resetUrl: resetUrl,
-          email: user.email,
-          userRef: user.ref
+      if (emailService && process.env.RESEND_API_KEY) {
+        try {
+          emailResult = await emailService.sendPasswordReset(
+            user.email,
+            user.name,
+            resetToken
+          );
+          console.log('📧 Email service result:', emailResult.success ? 'Success' : 'Failed');
+        } catch (emailError) {
+          console.error('❌ Email service error:', emailError);
+          emailResult = { success: false, error: emailError.message };
         }
-      });
+      } else {
+        console.log('⚠️ Email service not available or RESEND_API_KEY not configured');
+        emailResult = { success: false, error: 'Email service not configured' };
+      }
+
+      const resetUrl = `https://fraffil.vercel.app/reset-password?token=${resetToken}`;
+      console.log('🔗 Reset URL generated:', resetUrl);
+
+      if (emailResult.success) {
+        console.log('✅ Reset email sent successfully to:', user.email);
+        res.status(200).json({
+          success: true,
+          message: `Reset link verstuurd naar ${user.email}`
+        });
+      } else {
+        console.log('⚠️ Email failed, but token saved. Returning debug info.');
+        res.status(200).json({
+          success: true,
+          message: `Reset link gegenereerd voor ${user.email} (email service niet beschikbaar)`,
+          debug: {
+            resetUrl: resetUrl,
+            email: user.email,
+            tokenId: tokenSaveResult.id,
+            emailError: emailResult.error
+          }
+        });
+      }
 
     } catch (dbError) {
       console.error('❌ Database error:', dbError);
