@@ -4,17 +4,6 @@ import crypto from 'crypto';
 // Token geldigheid: 1 uur
 const TOKEN_EXPIRY = 60 * 60 * 1000;
 
-// Dynamic import van email service
-async function getEmailService() {
-  try {
-    const emailModule = await import('../../../lib/email.js');
-    return emailModule.emailService || emailModule.default;
-  } catch (error) {
-    console.error('❌ Failed to load email service:', error);
-    return null;
-  }
-}
-
 // Save reset token in database
 async function saveResetToken(resetToken, email, userRef, userName, tokenExpiry) {
   try {
@@ -133,55 +122,26 @@ export default async function handler(req, res) {
         console.error('❌ Failed to save reset token:', tokenSaveResult.error);
         return res.status(500).json({
           success: false,
-          error: 'Er ging iets mis bij het genereren van de reset link'
+          error: 'Er ging iets mis bij het genereren van de reset link: ' + tokenSaveResult.error
         });
       }
 
       console.log('💾 Token saved successfully with ID:', tokenSaveResult.id);
 
-      // Send reset email
-      let emailResult = { success: false };
-      const emailService = await getEmailService();
-      
-      if (emailService && process.env.RESEND_API_KEY) {
-        try {
-          emailResult = await emailService.sendPasswordReset(
-            user.email,
-            user.name,
-            resetToken
-          );
-          console.log('📧 Email service result:', emailResult.success ? 'Success' : 'Failed');
-        } catch (emailError) {
-          console.error('❌ Email service error:', emailError);
-          emailResult = { success: false, error: emailError.message };
-        }
-      } else {
-        console.log('⚠️ Email service not available or RESEND_API_KEY not configured');
-        emailResult = { success: false, error: 'Email service not configured' };
-      }
-
       const resetUrl = `https://fraffil.vercel.app/reset-password?token=${resetToken}`;
       console.log('🔗 Reset URL generated:', resetUrl);
 
-      if (emailResult.success) {
-        console.log('✅ Reset email sent successfully to:', user.email);
-        res.status(200).json({
-          success: true,
-          message: `Reset link verstuurd naar ${user.email}`
-        });
-      } else {
-        console.log('⚠️ Email failed, but token saved. Returning debug info.');
-        res.status(200).json({
-          success: true,
-          message: `Reset link gegenereerd voor ${user.email} (email service niet beschikbaar)`,
-          debug: {
-            resetUrl: resetUrl,
-            email: user.email,
-            tokenId: tokenSaveResult.id,
-            emailError: emailResult.error
-          }
-        });
-      }
+      // For now, always return debug info (no email service)
+      res.status(200).json({
+        success: true,
+        message: `Reset link gegenereerd voor ${user.email}`,
+        debug: {
+          resetUrl: resetUrl,
+          email: user.email,
+          tokenId: tokenSaveResult.id,
+          note: 'Token opgeslagen in database - email service tijdelijk uitgeschakeld'
+        }
+      });
 
     } catch (dbError) {
       console.error('❌ Database error:', dbError);
