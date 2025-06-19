@@ -1,5 +1,101 @@
 import { sql } from '@vercel/postgres';
-import googleSheetsService from '../../../lib/googleSheets';
+import { google } from 'googleapis';
+
+// Direct Google Sheets implementation to avoid import issues
+async function getGoogleSheetsData(influencer) {
+  try {
+    // Create auth client
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        type: 'service_account',
+        private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+        client_id: '',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oauth2.googleapis.com/token',
+        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs'
+      },
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive.file'
+      ]
+    });
+
+    // Create sheets client
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+    const range = 'Blad1!A:D'; // Use known sheet name
+
+    console.log(`📊 Fetching Google Sheets data for ${influencer}...`);
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+    });
+
+    const rows = response.data.values || [];
+    
+    // Skip header row and filter for this influencer
+    const dataRows = rows.slice(1).filter(row => 
+      row.length >= 2 && row[1] && row[1].toLowerCase() === influencer.toLowerCase()
+    );
+    
+    console.log(`📊 Found ${dataRows.length} orders for ${influencer}`);
+    
+    if (dataRows.length === 0) {
+      return {
+        totalSales: 0,
+        totalRevenue: 0,
+        avgOrderValue: 0,
+        lastSale: null,
+        recentOrders: []
+      };
+    }
+
+    // Calculate stats
+    let totalRevenue = 0;
+    const orders = [];
+    
+    dataRows.forEach(row => {
+      const amount = row[3] ? parseFloat(row[3]) : 75.00; // Use amount from sheets or fallback
+      totalRevenue += amount;
+      
+      orders.push({
+        date: row[0] || '',
+        orderId: row[2] || '',
+        amount: amount
+      });
+    });
+    
+    const totalSales = dataRows.length;
+    const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+    
+    // Sort orders by date (newest first)
+    const sortedOrders = orders.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const lastSale = sortedOrders[0]?.date || null;
+    const recentOrders = sortedOrders.slice(0, 5);
+
+    console.log(`📊 Calculated stats for ${influencer}:`, {
+      totalSales,
+      totalRevenue: totalRevenue.toFixed(2),
+      avgOrderValue: avgOrderValue.toFixed(2),
+      lastSale
+    });
+
+    return {
+      totalSales,
+      totalRevenue,
+      avgOrderValue,
+      lastSale,
+      recentOrders
+    };
+
+  } catch (error) {
+    console.error('❌ Google Sheets error:', error);
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   // CORS headers
@@ -47,11 +143,11 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Account is inactive' });
     }
 
-    // Get real stats from Google Sheets
+    // Get real stats from Google Sheets using direct implementation
     let googleSheetsStats = null;
     try {
       console.log('📊 Fetching Google Sheets data for:', targetUser);
-      googleSheetsStats = await googleSheetsService.getInfluencerStats(targetUser);
+      googleSheetsStats = await getGoogleSheetsData(targetUser);
       console.log('✅ Google Sheets data retrieved:', googleSheetsStats);
     } catch (error) {
       console.error('⚠️ Google Sheets error:', error);
@@ -59,7 +155,7 @@ export default async function handler(req, res) {
     }
 
     // Calculate commission based on real data
-    const commissionRate = influencerData.commission || 6.0;
+    const commissionRate = parseFloat(influencerData.commission) || 6.0;
     const totalRevenue = googleSheetsStats?.totalRevenue || 0;
     const totalCommission = (totalRevenue * commissionRate) / 100;
 
@@ -74,16 +170,14 @@ export default async function handler(req, res) {
       commissionRate: commissionRate,
       accountStatus: influencerData.status,
       memberSince: influencerData.created_at,
-      // Calculate monthly stats
-      monthlyStats: googleSheetsStats?.monthlyStats || {},
-      // Current month stats
+      // TODO: Calculate monthly stats from Google Sheets data
       thisMonth: {
-        sales: 0, // TODO: Calculate from monthly stats
+        sales: 0,
         revenue: 0,
         commission: 0
       },
       lastMonth: {
-        sales: 0, // TODO: Calculate from monthly stats  
+        sales: 0,
         revenue: 0,
         commission: 0
       }
@@ -93,7 +187,7 @@ export default async function handler(req, res) {
       totalSales: stats.totalSales,
       totalRevenue: stats.totalRevenue.toFixed(2),
       totalCommission: stats.totalCommission.toFixed(2),
-      dataSource: googleSheetsStats ? 'Google Sheets' : 'fallback'
+      dataSource: googleSheetsStats ? 'Google Sheets (direct)' : 'fallback'
     });
 
     res.status(200).json({
@@ -106,7 +200,7 @@ export default async function handler(req, res) {
         commission: influencerData.commission,
         status: influencerData.status
       },
-      dataSource: googleSheetsStats ? 'Google Sheets' : 'fallback',
+      dataSource: googleSheetsStats ? 'Google Sheets (direct)' : 'fallback',
       lastUpdated: new Date().toISOString()
     });
 
