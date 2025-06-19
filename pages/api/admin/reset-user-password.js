@@ -1,5 +1,6 @@
 import { sql } from '@vercel/postgres';
 import crypto from 'crypto';
+import { emailService } from '../../../lib/email.js';
 
 // Token geldigheid: 1 uur
 const TOKEN_EXPIRY = 60 * 60 * 1000;
@@ -150,20 +151,68 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('✅ Reset process completed successfully');
-    
-    const resetUrl = `https://fraffil.vercel.app/reset-password?token=${resetToken}`;
+    console.log('✅ Token saved successfully with ID:', tokenSaveResult.id);
 
-    res.status(200).json({
-      success: true,
-      message: `Reset link gegenereerd voor ${user.email}`,
-      debug: {
-        resetUrl: resetUrl,
-        email: user.email,
-        tokenId: tokenSaveResult.id,
-        note: 'Token succesvol opgeslagen'
+    // Step 5: Send email via Resend
+    try {
+      console.log('📧 Sending password reset email to:', user.email);
+      
+      const emailResult = await emailService.sendPasswordReset(
+        user.email,
+        user.name || user.ref,
+        resetToken
+      );
+
+      if (!emailResult.success) {
+        console.error('❌ Email sending failed:', emailResult.error);
+        // Email failed, but token is saved, so we can still return success with debug info
+        return res.status(200).json({
+          success: true,
+          message: `Reset token gegenereerd voor ${user.email}`,
+          warning: 'Email kon niet worden verzonden',
+          emailError: emailResult.error,
+          debug: {
+            resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
+            email: user.email,
+            tokenId: tokenSaveResult.id,
+            note: 'Token opgeslagen - email verzending gefaald'
+          }
+        });
       }
-    });
+
+      console.log('✅ Password reset email sent successfully!', emailResult.messageId);
+
+      // Everything successful
+      res.status(200).json({
+        success: true,
+        message: `Reset email verzonden naar ${user.email}`,
+        emailSent: true,
+        emailId: emailResult.messageId,
+        debug: {
+          resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
+          email: user.email,
+          tokenId: tokenSaveResult.id,
+          note: 'Email succesvol verzonden via Resend'
+        }
+      });
+
+    } catch (emailError) {
+      console.error('❌ Email service error:', emailError);
+      
+      // Email failed, but token is saved
+      res.status(200).json({
+        success: true,
+        message: `Reset token gegenereerd voor ${user.email}`,
+        warning: 'Email service tijdelijk niet beschikbaar',
+        emailError: emailError.message,
+        debug: {
+          resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
+          email: user.email,
+          tokenId: tokenSaveResult.id,
+          note: 'Token opgeslagen - email service error'
+        }
+      });
+    }
 
   } catch (error) {
     console.error('❌ General error:', error);
