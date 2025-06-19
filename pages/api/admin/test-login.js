@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   const { username, password } = req.body;
 
-  console.log('Admin login attempt:', { username });
+  console.log('🔐 Test login attempt:', { username, hasPassword: !!password });
 
   if (!username || !password) {
     return res.status(400).json({ 
@@ -42,20 +42,22 @@ export default async function handler(req, res) {
       loginTime: new Date().toISOString()
     };
 
-    console.log('Successful admin login:', username);
+    console.log('✅ Successful test login:', username);
 
     return res.status(200).json({
       success: true,
       token: token,
       admin: adminUser,
-      message: `Welcome back, ${username}!`
+      message: `Test login successful for ${username}!`,
+      timestamp: new Date().toISOString()
     });
   } else {
-    console.log('Failed admin login attempt:', username);
+    console.log('❌ Failed test login attempt:', username);
     
     return res.status(401).json({
       success: false,
-      error: 'Invalid admin credentials'
+      error: 'Invalid admin credentials',
+      timestamp: new Date().toISOString()
     });
   }
 } 

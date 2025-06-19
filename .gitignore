@@ -63,3 +63,4 @@ Desktop.ini
 # Google API Credentials
 google-credentials.json
 service-account-key.json 
+.vercel
