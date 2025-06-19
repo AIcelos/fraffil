@@ -1,4 +1,4 @@
-import { getAllInfluencers, createInfluencer } from '../../../lib/database.js';
+const { getAllInfluencers, createInfluencer } = require('../../../lib/database.js');
 import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {

@@ -1,4 +1,4 @@
-import { updateInfluencer, deleteInfluencer, getInfluencer } from '../../../../lib/database.js';
+const { updateInfluencer, deleteInfluencer, getInfluencer } = require('../../../../lib/database.js');
 
 export default async function handler(req, res) {
   // CORS headers
