@@ -29,7 +29,39 @@ export default function AdminDashboard() {
     try {
       setIsLoading(true);
       
-      // Load users from database to calculate stats
+      // Load stats from new Google Sheets integrated API
+      try {
+        const statsResponse = await fetch('/api/admin/stats', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        });
+        
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          
+          if (statsData.success) {
+            const stats = statsData.data;
+            
+            console.log('🔍 Admin Dashboard: Stats from Google Sheets + DB:', stats);
+            
+            setSystemStats(stats);
+            setInfluencers(stats.influencers || []);
+            setError(null);
+            console.log('✅ Admin Dashboard loaded with Google Sheets data:', {
+              totalRevenue: stats.totalRevenue?.toFixed(2),
+              totalOrders: stats.totalOrders,
+              totalInfluencers: stats.totalInfluencers,
+              dataSource: statsData.dataSource
+            });
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.log('⚠️ Stats API not available, trying fallback:', apiError.message);
+      }
+      
+      // Fallback to users API if stats API fails
       try {
         const usersResponse = await fetch('/api/admin/users-db', {
           headers: {
@@ -43,21 +75,22 @@ export default function AdminDashboard() {
           if (usersData.success) {
             const users = usersData.users || [];
             
-            console.log('🔍 Dashboard: Raw users data:', users);
-            console.log('🔍 Dashboard: Users count:', users.length);
+            console.log('🔍 Dashboard: Fallback to users data:', users);
             
-            // Calculate stats from database users
+            // Calculate basic stats from database users (without Google Sheets)
             const stats = {
-              totalRevenue: 0, // TODO: Connect to Google Sheets for order data
-              totalOrders: 0,  // TODO: Connect to Google Sheets for order data
+              totalRevenue: 0,
+              totalOrders: 0,
+              totalCommission: 0,
               activeInfluencers: users.filter(user => user.status === 'active').length,
               totalInfluencers: users.length,
               influencers: users.map(user => ({
                 name: user.ref,
-                totalSales: 0,      // TODO: Connect to Google Sheets
-                totalRevenue: 0,    // TODO: Connect to Google Sheets
-                lastSale: null,     // TODO: Connect to Google Sheets
-                recentOrders: [],   // TODO: Connect to Google Sheets
+                totalSales: 0,
+                totalRevenue: 0,
+                totalCommission: 0,
+                lastSale: null,
+                recentOrders: [],
                 email: user.email || '',
                 phone: user.phone || '',
                 commission: parseFloat(user.commission) || 6.00,
@@ -71,46 +104,44 @@ export default function AdminDashboard() {
               }))
             };
             
-            console.log('🔍 Transformed stats:', stats);
-            console.log('🔍 Influencers array:', stats.influencers);
-            
             setSystemStats(stats);
             setInfluencers(stats.influencers);
             setError(null);
-            console.log('✅ Dashboard loaded from Neon database:', users.length, 'users');
+            console.log('✅ Dashboard loaded from fallback database:', users.length, 'users');
             return;
           }
         }
-      } catch (apiError) {
-        console.log('⚠️ Database API not available, using fallback:', apiError.message);
+      } catch (fallbackError) {
+        console.log('⚠️ Fallback API also failed:', fallbackError.message);
       }
       
-      // Fallback to local data if API fails
-      const fallbackStats = {
+      // Final fallback to empty data
+      const emptyStats = {
         totalRevenue: 0,
         totalOrders: 0,
+        totalCommission: 0,
         activeInfluencers: 0,
         totalInfluencers: 0,
         influencers: []
       };
       
-      setSystemStats(fallbackStats);
+      setSystemStats(emptyStats);
       setInfluencers([]);
-      setError(null); // Don't show error to user - graceful degradation
-      console.log('📊 Using fallback dashboard data');
+      setError(null);
+      console.log('📊 Using empty fallback data');
       
     } catch (error) {
-      console.error('Dashboard load error:', error);
-      // Even if everything fails, show working dashboard with zero data
+      console.error('❌ Dashboard load error:', error);
       setSystemStats({
         totalRevenue: 0,
         totalOrders: 0,
+        totalCommission: 0,
         activeInfluencers: 0,
         totalInfluencers: 0,
         influencers: []
       });
       setInfluencers([]);
-      setError(null); // Don't show error to user
+      setError(null);
     } finally {
       setIsLoading(false);
     }
@@ -392,6 +423,57 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Additional Stats Row */}
+        {systemStats && systemStats.totalCommission > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-700 rounded-lg">
+                  <svg className="h-6 w-6 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-400">Total Commission</p>
+                  <p className="text-2xl font-bold text-green-300">{formatCurrency(systemStats.totalCommission)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-700 rounded-lg">
+                  <svg className="h-6 w-6 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-400">Average Order</p>
+                  <p className="text-2xl font-bold text-blue-300">
+                    {systemStats.totalOrders > 0 ? formatCurrency(systemStats.totalRevenue / systemStats.totalOrders) : '€0,00'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-700 rounded-lg">
+                  <svg className="h-6 w-6 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-400">Commission Rate</p>
+                  <p className="text-2xl font-bold text-purple-300">
+                    {systemStats.totalRevenue > 0 ? `${((systemStats.totalCommission / systemStats.totalRevenue) * 100).toFixed(1)}%` : '0%'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Influencers Table */}
         <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700">
           <div className="px-6 py-4 border-b border-gray-700">
@@ -423,6 +505,12 @@ export default function AdminDashboard() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Sales
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Revenue
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Commission
@@ -458,7 +546,15 @@ export default function AdminDashboard() {
                       <div className="text-sm text-gray-200">{influencer.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white">{influencer.commission}%</div>
+                      <div className="text-sm font-medium text-white">{influencer.totalSales || 0}</div>
+                      <div className="text-xs text-gray-400">orders</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-white">{formatCurrency(influencer.totalRevenue || 0)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-green-300">{formatCurrency(influencer.totalCommission || 0)}</div>
+                      <div className="text-xs text-gray-400">{influencer.commission}% rate</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -485,7 +581,7 @@ export default function AdminDashboard() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center">
+                    <td colSpan="8" className="px-6 py-8 text-center">
                       <div className="text-gray-400">
                         <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
