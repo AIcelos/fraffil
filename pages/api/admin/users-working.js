@@ -1,3 +1,6 @@
+// Tijdelijke in-memory opslag voor gebruikers
+let tempUsers = [];
+
 export default function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,17 +21,23 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // Return empty users list for now
+    // Return current users list
+    console.log('📋 Admin requesting all users - found:', tempUsers.length);
+    
     return res.status(200).json({
       success: true,
-      users: [],
-      count: 0,
-      message: 'User management is working! Database integration coming soon.'
+      users: tempUsers,
+      count: tempUsers.length,
+      message: tempUsers.length > 0 
+        ? `${tempUsers.length} gebruiker(s) geladen (tijdelijke opslag)`
+        : 'Geen gebruikers gevonden. Voeg de eerste gebruiker toe!'
     });
 
   } else if (req.method === 'POST') {
-    // Simulate user creation
+    // Create new user and store in memory
     const userData = req.body;
+    
+    console.log('👤 Admin creating new user:', userData.ref);
 
     // Basic validation
     if (!userData.ref || !userData.name || !userData.email) {
@@ -38,17 +47,43 @@ export default function handler(req, res) {
       });
     }
 
-    // Simulate successful creation
+    // Check if user already exists
+    const existingUser = tempUsers.find(user => user.ref === userData.ref);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: `Gebruiker ${userData.ref} bestaat al`
+      });
+    }
+
+    // Create new user object
+    const newUser = {
+      id: tempUsers.length + 1,
+      ref: userData.ref,
+      name: userData.name,
+      email: userData.email.toLowerCase(),
+      phone: userData.phone || '',
+      instagram: userData.instagram || '',
+      tiktok: userData.tiktok || '',
+      youtube: userData.youtube || '',
+      commission: parseFloat(userData.commission) || 6.00,
+      status: userData.status || 'active',
+      notes: userData.notes || '',
+      created: new Date().toISOString(),
+      lastLogin: null,
+      totalSales: 0,
+      totalRevenue: 0
+    };
+
+    // Add to temporary storage
+    tempUsers.push(newUser);
+
+    console.log('✅ User created and stored:', userData.ref, '- Total users:', tempUsers.length);
+
     return res.status(201).json({
       success: true,
-      message: `Gebruiker ${userData.ref} geregistreerd! Database integratie wordt toegevoegd.`,
-      user: {
-        ref: userData.ref,
-        name: userData.name,
-        email: userData.email,
-        status: 'pending',
-        created: new Date().toISOString()
-      }
+      message: `Gebruiker ${userData.ref} succesvol aangemaakt! (${tempUsers.length} gebruikers totaal)`,
+      user: newUser
     });
 
   } else {
