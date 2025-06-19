@@ -1,3 +1,6 @@
+import { sql } from '@vercel/postgres';
+import bcrypt from 'bcryptjs';
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,7 +18,7 @@ export default async function handler(req, res) {
 
   const { username, password } = req.body;
 
-  console.log('🔐 Test login attempt:', { username, hasPassword: !!password });
+  console.log('Test login attempt:', { username, password });
 
   if (!username || !password) {
     return res.status(400).json({ 
@@ -24,40 +27,59 @@ export default async function handler(req, res) {
     });
   }
 
-  // Admin credentials - Updated with sven@filright.com access
-  const adminCredentials = {
-    'admin': 'admin123',
-    'filright': 'filright2025',
-    'stefan': 'stefan_admin123',
-    'sven': 'sven_admin_2025'
-  };
+  try {
+    // Check database for admin user
+    const result = await sql`
+      SELECT id, username, password_hash, email, role, status, last_login
+      FROM admin_users 
+      WHERE username = ${username}
+    `;
 
-  if (adminCredentials[username] && adminCredentials[username] === password) {
-    // Generate simple token (in production, use JWT)
-    const token = `admin_${username}_${Date.now()}`;
+    console.log('Database query result:', result.rows);
+
+    if (result.rows.length === 0) {
+      return res.status(200).json({
+        success: false,
+        error: 'User not found',
+        debug: {
+          username: username,
+          found: false
+        }
+      });
+    }
+
+    const adminUser = result.rows[0];
+
+    // Test password comparison
+    const isValidPassword = await bcrypt.compare(password, adminUser.password_hash);
     
-    const adminUser = {
-      username: username,
-      role: 'admin',
-      loginTime: new Date().toISOString()
-    };
-
-    console.log('✅ Successful test login:', username);
+    console.log('Password comparison:', {
+      provided: password,
+      stored_hash: adminUser.password_hash,
+      valid: isValidPassword
+    });
 
     return res.status(200).json({
-      success: true,
-      token: token,
-      admin: adminUser,
-      message: `Test login successful for ${username}!`,
-      timestamp: new Date().toISOString()
+      success: isValidPassword,
+      debug: {
+        username: username,
+        found: true,
+        user_status: adminUser.status,
+        password_valid: isValidPassword,
+        user_email: adminUser.email,
+        user_role: adminUser.role
+      }
     });
-  } else {
-    console.log('❌ Failed test login attempt:', username);
-    
-    return res.status(401).json({
+
+  } catch (error) {
+    console.error('Test login error:', error);
+    return res.status(500).json({
       success: false,
-      error: 'Invalid admin credentials',
-      timestamp: new Date().toISOString()
+      error: error.message,
+      debug: {
+        username: username,
+        database_error: true
+      }
     });
   }
 } 
