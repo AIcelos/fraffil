@@ -1,4 +1,4 @@
-module.exports = async function handler(req, res) {
+function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
       // Return empty users list for now
       console.log('📋 Admin requesting all users (basic mode)');
       
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         users: [],
         count: 0,
@@ -44,7 +44,7 @@ module.exports = async function handler(req, res) {
       }
 
       // Simulate successful creation
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: `Gebruiker ${userData.ref} geregistreerd (database integratie wordt toegevoegd)`,
         user: {
@@ -56,7 +56,7 @@ module.exports = async function handler(req, res) {
       });
 
     } else {
-      res.status(405).json({
+      return res.status(405).json({
         success: false,
         error: 'Method not allowed'
       });
@@ -65,7 +65,7 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error('❌ Basic users API error:', error);
     
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       users: [],
       count: 0,
@@ -73,4 +73,6 @@ module.exports = async function handler(req, res) {
       timestamp: new Date().toISOString()
     });
   }
-} 
+}
+
+module.exports = handler; 
