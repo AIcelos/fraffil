@@ -240,7 +240,10 @@ export default function AdminDashboard() {
                   </svg>
                   Email Templates
                 </button>
-                <button className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <button 
+                  onClick={() => router.push('/admin/users')}
+                  className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
                   Add Influencer
                 </button>
               </div>
