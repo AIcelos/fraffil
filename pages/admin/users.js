@@ -37,7 +37,7 @@ export default function UserManager() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/users-working', {
+      const response = await fetch('/api/admin/users-production', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
@@ -46,11 +46,13 @@ export default function UserManager() {
       const data = await response.json();
       if (data.success) {
         setUsers(data.users || []);
+        setError(''); // Clear any previous errors
       } else {
         setError(data.error || 'Failed to load users');
       }
     } catch (error) {
-      setError('Network error loading users');
+      console.error('Load users error:', error);
+      setError('Network error loading users - check database connection');
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ export default function UserManager() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/admin/users-working', {
+      const response = await fetch('/api/admin/users-production', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,19 +75,20 @@ export default function UserManager() {
 
       const data = await response.json();
       if (data.success) {
-        setSuccess(`Gebruiker ${newUser.ref} succesvol aangemaakt!`);
+        setSuccess(data.message || `Gebruiker ${newUser.ref} succesvol aangemaakt!`);
         setNewUser({
           ref: '', name: '', email: '', phone: '', instagram: '', 
           tiktok: '', youtube: '', commission: '6.00', status: 'active', 
           notes: '', password: ''
         });
         setShowCreateForm(false);
-        loadUsers();
+        loadUsers(); // Reload to show new user
       } else {
         setError(data.error || 'Failed to create user');
       }
     } catch (error) {
-      setError('Network error creating user');
+      console.error('Create user error:', error);
+      setError('Network error creating user - check database connection');
     }
   };
 
@@ -164,7 +167,7 @@ export default function UserManager() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Gebruikers laden...</p>
+          <p className="text-gray-600">Gebruikers laden uit database...</p>
         </div>
       </div>
     );
@@ -179,7 +182,7 @@ export default function UserManager() {
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">👥 Gebruikersbeheer</h1>
-                <p className="text-sm text-gray-600">Beheer influencers en hun accounts</p>
+                <p className="text-sm text-gray-600">Beheer influencers en hun accounts (PostgreSQL Database)</p>
               </div>
               <div className="flex space-x-3">
                 <button

@@ -2,53 +2,45 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 export default function AdminDashboard() {
-  const [adminUser, setAdminUser] = useState(null);
   const [systemStats, setSystemStats] = useState(null);
   const [influencers, setInfluencers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminUser, setAdminUser] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
-    // Check admin authentication - only client-side
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('adminToken');
-      const user = localStorage.getItem('adminUser');
-      
-      if (!token || !user) {
-        router.push('/admin/login');
-        return;
-      }
-
-      setAdminUser(JSON.parse(user));
+    const adminToken = localStorage.getItem('adminToken');
+    const storedAdminUser = localStorage.getItem('adminUser');
+    
+    if (adminToken && storedAdminUser) {
+      setAdminUser(JSON.parse(storedAdminUser));
       setIsAuthenticated(true);
-    }
-  }, [router]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
       loadDashboardData();
+    } else {
+      router.push('/admin/login');
     }
-  }, [isAuthenticated]);
+  }, []);
 
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
       
-      // Try to load system statistics, but fallback to local data
+      // Try to load system statistics from production database
       try {
-        const statsResponse = await fetch('/api/admin/stats-working');
+        const statsResponse = await fetch('/api/admin/stats-production');
         const statsData = await statsResponse.json();
         
         if (statsData.success) {
           setSystemStats(statsData.data);
           setInfluencers(statsData.data.influencers || []);
           setError(null);
+          console.log('✅ Dashboard loaded from production database:', statsData.message);
           return;
         }
       } catch (apiError) {
-        console.log('API not available, using fallback data:', apiError.message);
+        console.log('⚠️ Production API not available, using fallback:', apiError.message);
       }
       
       // Fallback to local data if API fails
@@ -62,7 +54,8 @@ export default function AdminDashboard() {
       
       setSystemStats(fallbackStats);
       setInfluencers([]);
-      setError(null); // Clear any previous errors
+      setError(null); // Don't show error to user - graceful degradation
+      console.log('📊 Using fallback dashboard data');
       
     } catch (error) {
       console.error('Dashboard load error:', error);
@@ -100,7 +93,7 @@ export default function AdminDashboard() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300 mx-auto"></div>
           <p className="mt-4 text-gray-300">
-            {!isAuthenticated ? 'Authenticatie controleren...' : 'Admin dashboard laden...'}
+            {!isAuthenticated ? 'Authenticatie controleren...' : 'Admin dashboard laden uit database...'}
           </p>
         </div>
       </div>
@@ -121,7 +114,7 @@ export default function AdminDashboard() {
               </div>
               <div className="ml-3">
                 <h1 className="text-xl font-semibold text-white">Filright Admin Panel</h1>
-                <p className="text-sm text-gray-400">Affiliate Management System</p>
+                <p className="text-sm text-gray-400">Affiliate Management System (PostgreSQL Database)</p>
               </div>
             </div>
             
@@ -242,10 +235,8 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-400">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-white">
-                    {systemStats.totalOrders > 0 ? formatCurrency(systemStats.totalRevenue / systemStats.totalOrders) : '€0.00'}
-                  </p>
+                  <p className="text-sm font-medium text-gray-400">Total Users</p>
+                  <p className="text-2xl font-bold text-white">{systemStats.totalInfluencers}</p>
                 </div>
               </div>
             </div>
@@ -256,7 +247,7 @@ export default function AdminDashboard() {
         <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700">
           <div className="px-6 py-4 border-b border-gray-700">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-white">Influencer Performance</h2>
+              <h2 className="text-lg font-semibold text-white">Influencer Performance (Database)</h2>
               <div className="flex space-x-3">
                 <button 
                   onClick={() => router.push('/admin/email-tester')}
@@ -285,16 +276,16 @@ export default function AdminDashboard() {
                     Influencer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Sales
+                    Email
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Revenue
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Last Sale
+                    Commission
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Created
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Actions
@@ -302,8 +293,8 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {influencers.map((influencer, index) => (
-                  <tr key={index} className="hover:bg-gray-700 cursor-pointer" onClick={() => router.push(`/admin/influencer/${influencer.name}`)}>
+                {influencers.length > 0 ? influencers.map((influencer, index) => (
+                  <tr key={index} className="hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 bg-gray-600 rounded-full flex items-center justify-center">
@@ -318,60 +309,61 @@ export default function AdminDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-200">{influencer.totalSales}</div>
+                      <div className="text-sm text-gray-200">{influencer.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white">{formatCurrency(influencer.totalRevenue)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-200">
-                        {influencer.lastSale ? new Date(influencer.lastSale).toLocaleDateString('nl-NL') : 'Never'}
-                      </div>
+                      <div className="text-sm font-medium text-white">{influencer.commission}%</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        influencer.totalSales > 0 
-                          ? 'bg-gray-700 text-gray-200' 
-                          : 'bg-gray-600 text-gray-300'
+                        influencer.status === 'active' 
+                          ? 'bg-green-900 text-green-200' 
+                          : 'bg-red-900 text-red-200'
                       }`}>
-                        {influencer.totalSales > 0 ? 'Active' : 'Inactive'}
+                        {influencer.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-400">
+                        {influencer.created_at ? new Date(influencer.created_at).toLocaleDateString('nl-NL') : 'Onbekend'}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/admin/influencer/${influencer.name}`);
-                        }}
-                        className="text-gray-300 hover:text-white mr-3"
-                      >
-                        View
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/admin/influencer/${influencer.name}`);
-                        }}
-                        className="text-gray-400 hover:text-gray-200"
+                      <button
+                        onClick={() => router.push(`/admin/users`)}
+                        className="text-blue-400 hover:text-blue-300 mr-3"
                       >
                         Edit
                       </button>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-8 text-center">
+                      <div className="text-gray-400">
+                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <h3 className="mt-2 text-sm font-medium text-gray-300">Geen influencers gevonden</h3>
+                        <p className="mt-1 text-sm text-gray-400">Voeg je eerste influencer toe om te beginnen.</p>
+                        <div className="mt-6">
+                          <button
+                            onClick={() => router.push('/admin/users')}
+                            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                          >
+                            <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Nieuwe Influencer
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-          
-          {influencers.length === 0 && (
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-white">No influencers found</h3>
-              <p className="mt-1 text-sm text-gray-400">Get started by adding your first influencer.</p>
-            </div>
-          )}
         </div>
       </main>
     </div>
