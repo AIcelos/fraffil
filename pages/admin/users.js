@@ -162,6 +162,42 @@ export default function UserManager() {
     }
   };
 
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+  };
+
+  const handleSaveUser = async (updatedUser) => {
+    try {
+      setError('');
+      setSuccess('');
+      
+      const response = await fetch('/api/admin/users-db', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify(updatedUser)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setSuccess(`Gebruiker ${updatedUser.ref} succesvol bijgewerkt!`);
+        setEditingUser(null);
+        loadUsers(); // Reload to show updated user
+      } else {
+        setError(data.error || 'Failed to update user');
+      }
+    } catch (error) {
+      console.error('Update user error:', error);
+      setError('Network error updating user');
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingUser(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -480,7 +516,7 @@ export default function UserManager() {
                           🔑
                         </button>
                         <button
-                          onClick={() => setEditingUser(user)}
+                          onClick={() => handleEditUser(user)}
                           className="text-indigo-600 hover:text-indigo-900"
                           title="Bewerken"
                         >
@@ -502,6 +538,233 @@ export default function UserManager() {
           )}
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-screen overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                ✏️ Gebruiker Bewerken: {editingUser.name}
+              </h3>
+              <button
+                onClick={handleCloseEditModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <EditUserForm 
+              user={editingUser}
+              onSave={handleSaveUser}
+              onCancel={handleCloseEditModal}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
+
+// Edit User Form Component
+const EditUserForm = ({ user, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    ref: user.ref || '',
+    name: user.name || '',
+    email: user.email || '',
+    phone: user.phone || '',
+    commission: user.commission || '6.00',
+    status: user.status || 'active',
+    instagram: user.instagram || '',
+    tiktok: user.tiktok || '',
+    youtube: user.youtube || '',
+    notes: user.notes || ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Referral Code *
+          </label>
+          <input
+            type="text"
+            name="ref"
+            value={formData.ref}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+            disabled
+            title="Referral code kan niet gewijzigd worden"
+          />
+          <p className="text-xs text-gray-500 mt-1">Referral code kan niet gewijzigd worden</p>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Naam *
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Email
+        </label>
+        <input
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Telefoon
+          </label>
+          <input
+            type="tel"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Commissie (%)
+          </label>
+          <input
+            type="number"
+            name="commission"
+            value={formData.commission}
+            onChange={handleChange}
+            step="0.01"
+            min="0"
+            max="100"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Status
+        </label>
+        <select
+          name="status"
+          value={formData.status}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="active">Actief</option>
+          <option value="inactive">Inactief</option>
+          <option value="pending">In behandeling</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Instagram
+          </label>
+          <input
+            type="text"
+            name="instagram"
+            value={formData.instagram}
+            onChange={handleChange}
+            placeholder="@username"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            TikTok
+          </label>
+          <input
+            type="text"
+            name="tiktok"
+            value={formData.tiktok}
+            onChange={handleChange}
+            placeholder="@username"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            YouTube
+          </label>
+          <input
+            type="text"
+            name="youtube"
+            value={formData.youtube}
+            onChange={handleChange}
+            placeholder="@channel"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Notities
+        </label>
+        <textarea
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          rows="3"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Extra notities over deze gebruiker..."
+        />
+      </div>
+
+      <div className="flex justify-end space-x-3 pt-4 border-t">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+        >
+          Annuleren
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          💾 Wijzigingen Opslaan
+        </button>
+      </div>
+    </form>
+  );
+}; 
