@@ -37,7 +37,7 @@ export default function AdminDashboard() {
       setIsLoading(true);
       
       // Load system statistics
-      const statsResponse = await fetch('/api/admin/stats');
+      const statsResponse = await fetch('/api/admin/stats-simple');
       const statsData = await statsResponse.json();
       
       if (statsData.success) {
