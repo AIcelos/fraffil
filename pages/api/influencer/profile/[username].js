@@ -1,4 +1,47 @@
-import { getInfluencer, updateInfluencer, createInfluencer } from '../../../../lib/database.js';
+import { sql } from '@vercel/postgres';
+
+// Get influencer profile from database
+async function getInfluencerProfile(username) {
+  try {
+    const result = await sql`
+      SELECT ref, name, email, phone, instagram, tiktok, youtube,
+             commission, status, notes, created_at, updated_at
+      FROM influencers 
+      WHERE ref = ${username.toLowerCase()}
+      LIMIT 1
+    `;
+    
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('❌ Error fetching influencer profile:', error);
+    throw error;
+  }
+}
+
+// Update influencer profile in database
+async function updateInfluencerProfile(username, data) {
+  try {
+    const result = await sql`
+      UPDATE influencers 
+      SET 
+        name = ${data.name || ''},
+        email = ${data.email || ''},
+        phone = ${data.phone || ''},
+        instagram = ${data.instagram || ''},
+        tiktok = ${data.tiktok || ''},
+        youtube = ${data.youtube || ''},
+        notes = ${data.notes || ''},
+        updated_at = NOW()
+      WHERE ref = ${username.toLowerCase()}
+      RETURNING ref, name, email, phone, instagram, tiktok, youtube, commission, status
+    `;
+    
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('❌ Error updating influencer profile:', error);
+    throw error;
+  }
+}
 
 export default async function handler(req, res) {
   const { username } = req.query;
@@ -17,25 +60,24 @@ export default async function handler(req, res) {
       // GET - Fetch influencer profile
       console.log(`📊 Fetching profile for: ${username}`);
       
-      const profile = await getInfluencer(username);
+      const profile = await getInfluencerProfile(username);
       
       if (profile) {
-        // Return profile data with additional fields
+        // Return profile data
         const profileData = {
           name: profile.name || '',
           email: profile.email || '',
           phone: profile.phone || '',
-          bankAccount: profile.bank_account || '',
-          bankName: profile.bank_name || '',
-          accountHolder: profile.account_holder || '',
           socialMedia: {
             instagram: profile.instagram || '',
             tiktok: profile.tiktok || '',
-            youtube: profile.youtube || '',
-            website: profile.website || ''
+            youtube: profile.youtube || ''
           },
-          preferredPayment: profile.preferred_payment || 'bank',
-          notes: profile.notes || ''
+          commission: profile.commission || 6.0,
+          status: profile.status || 'active',
+          notes: profile.notes || '',
+          memberSince: profile.created_at,
+          lastUpdated: profile.updated_at
         };
         
         return res.status(200).json({
@@ -50,67 +92,63 @@ export default async function handler(req, res) {
             name: '',
             email: '',
             phone: '',
-            bankAccount: '',
-            bankName: '',
-            accountHolder: '',
             socialMedia: {
               instagram: '',
               tiktok: '',
-              youtube: '',
-              website: ''
+              youtube: ''
             },
-            preferredPayment: 'bank',
+            commission: 6.0,
+            status: 'active',
             notes: ''
           },
           isDefault: true
         });
       }
       
-    } else if (req.method === 'POST') {
-      // POST - Save influencer profile
+    } else if (req.method === 'POST' || req.method === 'PUT') {
+      // POST/PUT - Save influencer profile
       console.log(`💾 Saving profile for: ${username}`);
       console.log('📋 Profile data:', req.body);
       
       const profileData = req.body;
       
-      // Prepare data for database
-      const dbData = {
-        ref: username,
+      // Check if influencer exists
+      const existingInfluencer = await getInfluencerProfile(username);
+      
+      if (!existingInfluencer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Influencer not found'
+        });
+      }
+      
+      // Prepare data for update
+      const updateData = {
         name: profileData.name || '',
         email: profileData.email || '',
         phone: profileData.phone || '',
-        bank_account: profileData.bankAccount || '',
-        bank_name: profileData.bankName || '',
-        account_holder: profileData.accountHolder || '',
         instagram: profileData.socialMedia?.instagram || '',
         tiktok: profileData.socialMedia?.tiktok || '',
         youtube: profileData.socialMedia?.youtube || '',
-        website: profileData.socialMedia?.website || '',
-        preferred_payment: profileData.preferredPayment || 'bank',
-        notes: profileData.notes || '',
-        status: 'active'
+        notes: profileData.notes || ''
       };
       
-      // Check if influencer exists
-      const existingInfluencer = await getInfluencer(username);
+      // Update profile
+      const result = await updateInfluencerProfile(username, updateData);
       
-      let result;
-      if (existingInfluencer) {
-        // Update existing influencer
-        result = await updateInfluencer(username, dbData);
+      if (result) {
         console.log(`✅ Updated profile for: ${username}`);
+        return res.status(200).json({
+          success: true,
+          data: result,
+          message: 'Profiel bijgewerkt'
+        });
       } else {
-        // Create new influencer with default commission
-        dbData.commission = 5.00; // Default commission rate
-        result = await createInfluencer(dbData);
-        console.log(`✅ Created new profile for: ${username}`);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to update profile'
+        });
       }
-      
-      return res.status(200).json({
-        success: true,
-        data: result,
-        message: existingInfluencer ? 'Profiel bijgewerkt' : 'Profiel aangemaakt'
-      });
       
     } else {
       return res.status(405).json({

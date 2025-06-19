@@ -62,13 +62,21 @@ export default async function handler(req, res) {
 
     console.log('✅ Successful login for:', username);
 
-    // Optionally update last login time
+    // Update last login time (add column if it doesn't exist)
     try {
+      // First, try to add the column if it doesn't exist
+      await sql`
+        ALTER TABLE influencers 
+        ADD COLUMN IF NOT EXISTS last_login TIMESTAMP
+      `;
+      
+      // Then update the last login time
       await sql`
         UPDATE influencers 
         SET last_login = NOW() 
         WHERE ref = ${username.toLowerCase()}
       `;
+      console.log('✅ Last login time updated');
     } catch (updateError) {
       console.warn('⚠️ Could not update last login time:', updateError.message);
     }
