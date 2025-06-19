@@ -4,6 +4,21 @@ import crypto from 'crypto';
 // Token geldigheid: 1 uur
 const TOKEN_EXPIRY = 60 * 60 * 1000;
 
+// Dynamic import van email service om runtime errors te voorkomen
+let emailService = null;
+async function getEmailService() {
+  if (!emailService) {
+    try {
+      const emailModule = await import('../../../lib/email.js');
+      emailService = emailModule.emailService || emailModule.default;
+    } catch (error) {
+      console.error('❌ Failed to load email service:', error);
+      emailService = false; // Mark as failed
+    }
+  }
+  return emailService === false ? null : emailService;
+}
+
 // Database functions using ES6 and @vercel/postgres
 async function getInfluencerByRef(ref) {
   try {
@@ -153,22 +168,54 @@ export default async function handler(req, res) {
       });
     }
 
-    // Voor nu skippen we de email service en geven altijd success terug
+    // Verstuur reset email met dynamic import
     console.log('✅ Reset token saved successfully for:', user.email);
     
+    let emailResult = { success: false };
+    const emailSvc = await getEmailService();
+    
+    if (emailSvc && process.env.RESEND_API_KEY) {
+      try {
+        emailResult = await emailSvc.sendPasswordReset(
+          user.email,
+          user.name,
+          resetToken
+        );
+        console.log('📧 Email service result:', emailResult.success ? 'Success' : 'Failed');
+      } catch (error) {
+        console.error('❌ Email service error:', error);
+        emailResult = { success: false, error: error.message };
+      }
+    } else {
+      console.log('⚠️ Email service not available or RESEND_API_KEY not configured');
+      emailResult = { success: false, error: 'Email service not configured' };
+    }
+
     // Development mode - altijd debug info tonen
     const resetUrl = `https://fraffil.vercel.app/reset-password?token=${resetToken}`;
     console.log('🔗 Reset URL:', resetUrl);
-    
-    res.status(200).json({
-      success: true,
-      message: `Reset link gegenereerd voor ${user.email}`,
-      debug: {
-        resetUrl: resetUrl,
-        email: user.email,
-        tokenId: tokenSaveResult.id
-      }
-    });
+
+    if (emailResult.success) {
+      console.log('✅ Admin password reset email sent to:', user.email);
+      res.status(200).json({
+        success: true,
+        message: `Reset link verstuurd naar ${user.email}`
+      });
+    } else {
+      console.error('❌ Reset email failed:', emailResult.error);
+      
+      // Altijd debug info tonen als email faalt
+      res.status(200).json({
+        success: true,
+        message: `Reset link gegenereerd voor ${user.email} (email niet verstuurd)`,
+        debug: {
+          resetUrl: resetUrl,
+          email: user.email,
+          tokenId: tokenSaveResult.id,
+          emailError: emailResult.error
+        }
+      });
+    }
 
   } catch (error) {
     console.error('❌ Admin reset password error:', error);
