@@ -13,8 +13,8 @@ async function ensureResetTokensTable() {
         id SERIAL PRIMARY KEY,
         token VARCHAR(255) UNIQUE NOT NULL,
         email VARCHAR(255) NOT NULL,
-        user_ref VARCHAR(100) NOT NULL,
-        user_name VARCHAR(255),
+        userref VARCHAR(100) NOT NULL,
+        username VARCHAR(255),
         expires_at TIMESTAMP NOT NULL,
         used BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW()
@@ -34,7 +34,7 @@ async function saveResetToken(resetToken, email, userRef, userName, tokenExpiry)
     console.log('💾 Saving reset token for:', { email, userRef, userName });
     
     const result = await sql`
-      INSERT INTO reset_tokens (token, email, user_ref, user_name, expires_at)
+      INSERT INTO reset_tokens (token, email, userref, username, expires_at)
       VALUES (${resetToken}, ${email}, ${userRef}, ${userName || ''}, ${new Date(tokenExpiry).toISOString()})
       RETURNING id
     `;
