@@ -1,14 +1,39 @@
-import { updateInfluencerPassword, getResetToken, markResetTokenAsUsed } from '../../lib/database.js';
-import { resetTokens } from './forgot-password.js';
+import { sql } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { token, password, confirmPassword } = req.body;
+    // Parse request body safely
+    let requestData;
+    try {
+      requestData = req.body;
+      if (typeof requestData === 'string') {
+        requestData = JSON.parse(requestData);
+      }
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      return res.status(400).json({
+        success: false,
+        error: 'Ongeldige request data'
+      });
+    }
+
+    const { token, password, confirmPassword } = requestData;
+
+    console.log('🔐 Password reset attempt for token:', token ? token.substring(0, 8) + '...' : 'undefined');
 
     // Validatie
     if (!token || !password || !confirmPassword) {
@@ -32,33 +57,16 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('🔐 Password reset attempt with token:', token.substring(0, 8) + '...');
-
-    // Eerst controleren in database
-    let tokenData = await getResetToken(token);
-    let usingDatabase = true;
-
-    // Als niet gevonden in database, controleer in-memory fallback
-    if (!tokenData) {
-      console.log('⚠️  Token not found in database, checking in-memory fallback');
-      const memoryTokenData = resetTokens.get(token);
-      
-      if (memoryTokenData) {
-        // Converteer in-memory format naar database format
-        tokenData = {
-          token: token,
-          email: memoryTokenData.email,
-          username: memoryTokenData.username,
-          name: memoryTokenData.name,
-          expires_at: new Date(memoryTokenData.expiry),
-          used: memoryTokenData.used
-        };
-        usingDatabase = false;
-        console.log('✅ Found token in in-memory storage');
-      }
-    } else {
-      console.log('✅ Found token in database');
-    }
+    // Zoek reset token in database
+    const tokenResult = await sql`
+      SELECT token, email, userref, username, expires_at, used
+      FROM reset_tokens 
+      WHERE token = ${token}
+      LIMIT 1
+    `;
+    
+    const tokenData = tokenResult.rows[0];
+    console.log('🔍 Token lookup result:', tokenData ? 'Found' : 'Not found');
     
     if (!tokenData) {
       console.log('❌ Invalid reset token:', token.substring(0, 8) + '...');
@@ -73,14 +81,14 @@ export default async function handler(req, res) {
     const expiryDate = new Date(tokenData.expires_at);
     
     if (now > expiryDate) {
-      console.log('❌ Expired reset token for:', tokenData.username);
+      console.log('❌ Expired reset token for:', tokenData.userref);
       
-      // Cleanup van verlopen token
-      if (usingDatabase) {
-        await markResetTokenAsUsed(token);
-      } else {
-        resetTokens.delete(token);
-      }
+      // Markeer token als gebruikt
+      await sql`
+        UPDATE reset_tokens 
+        SET used = TRUE 
+        WHERE token = ${token}
+      `;
       
       return res.status(400).json({
         success: false,
@@ -90,84 +98,65 @@ export default async function handler(req, res) {
 
     // Controleer of token al gebruikt is
     if (tokenData.used) {
-      console.log('❌ Token already used for:', tokenData.username);
+      console.log('❌ Token already used for:', tokenData.userref);
       return res.status(400).json({
         success: false,
         error: 'Deze reset link is al gebruikt'
       });
     }
 
-    console.log('✅ Valid reset token for:', tokenData.username);
+    console.log('✅ Valid reset token for:', tokenData.userref);
 
     // Hash het nieuwe wachtwoord
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
+    console.log('🔐 Password hashed successfully');
 
-    // Update wachtwoord in database (met fallback voor development)
-    let updateResult = { success: false };
+    // Update wachtwoord in influencers tabel
+    const updateResult = await sql`
+      UPDATE influencers 
+      SET password = ${hashedPassword}
+      WHERE ref = ${tokenData.userref}
+      RETURNING ref, name, email
+    `;
     
-    try {
-      updateResult = await updateInfluencerPassword(tokenData.username, hashedPassword);
-    } catch (error) {
-      console.log('⚠️  Database error, using development fallback:', error.message);
-      
-      // In development mode, simulate successful password update
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔐 Development mode - Password would be updated for:', tokenData.username);
-        console.log('🔐 New password hash:', hashedPassword.substring(0, 20) + '...');
-        updateResult = { success: true, user: { username: tokenData.username } };
-      } else {
-        updateResult = { success: false, error: error.message };
-      }
-    }
-    
-    if (!updateResult.success) {
-      console.error('❌ Failed to update password for:', tokenData.username, updateResult.error);
+    if (updateResult.rows.length === 0) {
+      console.error('❌ Failed to update password - user not found:', tokenData.userref);
       return res.status(500).json({
         success: false,
-        error: 'Er ging iets mis bij het bijwerken van je wachtwoord. Probeer het opnieuw.'
+        error: 'Gebruiker niet gevonden. Neem contact op met de beheerder.'
       });
     }
 
-    // Markeer token als gebruikt
-    if (usingDatabase) {
-      await markResetTokenAsUsed(token);
-    } else {
-      // Update in-memory token
-      const memoryToken = resetTokens.get(token);
-      if (memoryToken) {
-        memoryToken.used = true;
-        // Verwijder token na 5 minuten voor cleanup
-        setTimeout(() => {
-          resetTokens.delete(token);
-        }, 5 * 60 * 1000);
-      }
-    }
+    const updatedUser = updateResult.rows[0];
+    console.log('✅ Password updated for user:', updatedUser.ref);
 
-    console.log('✅ Password successfully reset for:', tokenData.username);
+    // Markeer token als gebruikt
+    await sql`
+      UPDATE reset_tokens 
+      SET used = TRUE 
+      WHERE token = ${token}
+    `;
+    console.log('✅ Reset token marked as used');
 
     res.status(200).json({
       success: true,
       message: 'Wachtwoord succesvol gewijzigd! Je kunt nu inloggen met je nieuwe wachtwoord.',
-      username: tokenData.username,
-      debug: process.env.NODE_ENV === 'development' ? {
-        tokenStorage: usingDatabase ? 'database' : 'in-memory'
-      } : undefined
+      user: {
+        ref: updatedUser.ref,
+        name: updatedUser.name,
+        email: updatedUser.email
+      }
     });
 
   } catch (error) {
     console.error('❌ Reset password error:', error);
+    console.error('❌ Error stack:', error.stack);
     
-    if (error.message.includes('missing_connection_string')) {
-      return res.status(500).json({
-        success: false,
-        error: 'Database niet geconfigureerd. Neem contact op met de beheerder.'
-      });
-    }
-
     res.status(500).json({
       success: false,
-      error: 'Er ging iets mis. Probeer het opnieuw.'
+      error: 'Er ging iets mis bij het wijzigen van je wachtwoord. Probeer het opnieuw.',
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 } 
