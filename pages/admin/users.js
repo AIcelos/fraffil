@@ -37,7 +37,7 @@ export default function UserManager() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/users-simple', {
+      const response = await fetch('/api/admin/users-database', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
@@ -64,7 +64,7 @@ export default function UserManager() {
     setSuccess('');
 
     try {
-      const response = await fetch('/api/admin/users-simple', {
+      const response = await fetch('/api/admin/users-database', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ export default function UserManager() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Gebruikers laden (in-memory)...</p>
+          <p className="text-gray-600">Gebruikers laden uit database...</p>
         </div>
       </div>
     );
@@ -182,7 +182,7 @@ export default function UserManager() {
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">👥 Gebruikersbeheer</h1>
-                <p className="text-sm text-gray-600">Beheer influencers en hun accounts (Tijdelijk: In-Memory Storage)</p>
+                <p className="text-sm text-gray-600">Beheer influencers en hun accounts (PostgreSQL Database)</p>
               </div>
               <div className="flex space-x-3">
                 <button
