@@ -1,4 +1,4 @@
-import { getInfluencer } from '../../../lib/database.js';
+import { sql } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
@@ -25,41 +25,15 @@ export default async function handler(req, res) {
   try {
     console.log('🔐 Login attempt for:', username);
 
-    // Check database availability
-    if (!process.env.POSTGRES_URL) {
-      console.log('⚠️  Database not configured - using fallback authentication');
-      
-      // Fallback voor development zonder database
-      const FALLBACK_USERS = {
-        'annemieke': { password: 'annemieke123', name: 'Annemieke' },
-        'stefan': { password: 'stefan123', name: 'Stefan' },
-        'lisa': { password: 'lisa123', name: 'Lisa' },
-        'mark': { password: 'mark123', name: 'Mark' },
-        'finaltest': { password: 'finaltest123', name: 'Final Test' },
-        'manual-test-456': { password: 'test123', name: 'Manual Test' }
-      };
-
-      const user = FALLBACK_USERS[username.toLowerCase()];
-      
-      if (!user || user.password !== password) {
-        console.log('❌ Failed fallback login for:', username);
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      console.log('✅ Successful fallback login for:', username);
-      return res.status(200).json({
-        success: true,
-        influencer: {
-          username: username.toLowerCase(),
-          name: user.name,
-          loginTime: new Date().toISOString(),
-          source: 'fallback'
-        }
-      });
-    }
-
-    // Database authentication
-    const influencer = await getInfluencer(username.toLowerCase());
+    // Database authentication via Neon PostgreSQL
+    const result = await sql`
+      SELECT ref, name, email, password, commission, status
+      FROM influencers 
+      WHERE ref = ${username.toLowerCase()}
+      LIMIT 1
+    `;
+    
+    const influencer = result.rows[0];
     
     if (!influencer) {
       console.log('❌ Influencer not found:', username);
@@ -68,7 +42,7 @@ export default async function handler(req, res) {
 
     // Check if account is active
     if (influencer.status !== 'active') {
-      console.log('❌ Inactive account:', username);
+      console.log('❌ Inactive account:', username, 'Status:', influencer.status);
       return res.status(401).json({ error: 'Account is inactive' });
     }
 
@@ -86,20 +60,28 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('✅ Successful database login for:', username);
+    console.log('✅ Successful login for:', username);
 
-    // Update last login time (optional)
-    // await updateInfluencerLastLogin(username);
+    // Optionally update last login time
+    try {
+      await sql`
+        UPDATE influencers 
+        SET last_login = NOW() 
+        WHERE ref = ${username.toLowerCase()}
+      `;
+    } catch (updateError) {
+      console.warn('⚠️ Could not update last login time:', updateError.message);
+    }
 
     return res.status(200).json({
       success: true,
       influencer: {
-        username: influencer.username || influencer.ref,
+        username: influencer.ref,
         name: influencer.name,
         email: influencer.email,
         commission: influencer.commission,
-        loginTime: new Date().toISOString(),
-        source: 'database'
+        status: influencer.status,
+        loginTime: new Date().toISOString()
       }
     });
 
@@ -110,13 +92,6 @@ export default async function handler(req, res) {
       stack: error.stack,
       username: username
     });
-    
-    // If database error, provide helpful message
-    if (error.message.includes('missing_connection_string')) {
-      return res.status(500).json({ 
-        error: 'Database connection not configured. Contact administrator.' 
-      });
-    }
     
     // If bcrypt error
     if (error.message.includes('bcrypt') || error.message.includes('hash')) {
