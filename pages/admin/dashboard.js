@@ -27,20 +27,54 @@ export default function AdminDashboard() {
     try {
       setIsLoading(true);
       
-      // Try to load system statistics from production database
+      // Load users from database to calculate stats
       try {
-        const statsResponse = await fetch('/api/admin/stats-production');
-        const statsData = await statsResponse.json();
+        const usersResponse = await fetch('/api/admin/users-db', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+          }
+        });
         
-        if (statsData.success) {
-          setSystemStats(statsData.data);
-          setInfluencers(statsData.data.influencers || []);
-          setError(null);
-          console.log('✅ Dashboard loaded from production database:', statsData.message);
-          return;
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json();
+          
+          if (usersData.success) {
+            const users = usersData.users || [];
+            
+            // Calculate stats from database users
+            const stats = {
+              totalRevenue: 0, // TODO: Connect to Google Sheets for order data
+              totalOrders: 0,  // TODO: Connect to Google Sheets for order data
+              activeInfluencers: users.filter(user => user.status === 'active').length,
+              totalInfluencers: users.length,
+              influencers: users.map(user => ({
+                name: user.ref,
+                totalSales: 0,      // TODO: Connect to Google Sheets
+                totalRevenue: 0,    // TODO: Connect to Google Sheets
+                lastSale: null,     // TODO: Connect to Google Sheets
+                recentOrders: [],   // TODO: Connect to Google Sheets
+                email: user.email || '',
+                phone: user.phone || '',
+                commission: user.commission || 6.00,
+                status: user.status || 'active',
+                instagram: user.instagram || '',
+                tiktok: user.tiktok || '',
+                youtube: user.youtube || '',
+                notes: user.notes || '',
+                profileComplete: true,
+                created_at: user.created_at
+              }))
+            };
+            
+            setSystemStats(stats);
+            setInfluencers(stats.influencers);
+            setError(null);
+            console.log('✅ Dashboard loaded from Neon database:', users.length, 'users');
+            return;
+          }
         }
       } catch (apiError) {
-        console.log('⚠️ Production API not available, using fallback:', apiError.message);
+        console.log('⚠️ Database API not available, using fallback:', apiError.message);
       }
       
       // Fallback to local data if API fails
@@ -93,7 +127,7 @@ export default function AdminDashboard() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300 mx-auto"></div>
           <p className="mt-4 text-gray-300">
-            {!isAuthenticated ? 'Authenticatie controleren...' : 'Admin dashboard laden uit database...'}
+            {!isAuthenticated ? 'Authenticatie controleren...' : 'Dashboard laden uit Neon PostgreSQL database...'}
           </p>
         </div>
       </div>
@@ -114,7 +148,7 @@ export default function AdminDashboard() {
               </div>
               <div className="ml-3">
                 <h1 className="text-xl font-semibold text-white">Filright Admin Panel</h1>
-                <p className="text-sm text-gray-400">Affiliate Management System (PostgreSQL Database)</p>
+                <p className="text-sm text-gray-400">Neon PostgreSQL Database - Live Dashboard</p>
               </div>
             </div>
             
