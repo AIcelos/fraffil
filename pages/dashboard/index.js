@@ -354,10 +354,10 @@ const Dashboard = () => {
               </div>
               <div className="text-right">
                 <div className="text-4xl font-bold bg-gradient-to-r from-green-500 to-emerald-600 bg-clip-text text-transparent">
-                  €{stats?.commission?.total?.toFixed(2) || '0.00'}
+                  €{stats?.totalCommission?.toFixed(2) || '0.00'}
                 </div>
                 <div className="text-sm text-gray-500">
-                  {stats?.commission?.rate || 0}% commissie
+                  {stats?.commissionRate || 0}% commissie
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
                   Op €{stats?.totalRevenue?.toFixed(2) || '0.00'} totale omzet
@@ -376,7 +376,7 @@ const Dashboard = () => {
                   €{(stats?.avgOrderValue || 0).toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  ≈ €{(stats?.commission?.avgPerOrder || 0).toFixed(2)} commissie
+                  ≈ €{((stats?.avgOrderValue || 0) * (stats?.commissionRate || 0) / 100).toFixed(2)} commissie
                 </div>
               </div>
 
@@ -402,7 +402,7 @@ const Dashboard = () => {
                   €{(stats?.totalRevenue || 0).toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  ≈ €{((stats?.totalRevenue || 0) * (stats?.commission?.rate || 0) / 100).toFixed(2)} commissie
+                  ≈ €{((stats?.totalRevenue || 0) * (stats?.commissionRate || 0) / 100).toFixed(2)} commissie
                 </div>
               </div>
             </div>
@@ -444,7 +444,7 @@ const Dashboard = () => {
                     <div className="text-right">
                       <div className="font-bold text-lg text-gray-900">€{order.amount.toFixed(2)}</div>
                       <div className="text-sm text-green-600 font-medium">
-                        +€{(order.amount * (stats?.commission?.rate || 0) / 100).toFixed(2)} commissie
+                        +€{(order.amount * (stats?.commissionRate || 0) / 100).toFixed(2)} commissie
                       </div>
                     </div>
                   </div>
