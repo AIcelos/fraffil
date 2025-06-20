@@ -12,6 +12,16 @@ export default function AdminDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const router = useRouter();
 
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({});
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchStats, setSearchStats] = useState(null);
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
+
   useEffect(() => {
     const adminToken = localStorage.getItem('adminToken');
     const storedAdminUser = localStorage.getItem('adminUser');
@@ -198,6 +208,83 @@ export default function AdminDashboard() {
     setEditingUser(null);
   };
 
+  // Search functionality
+  const handleSearch = async (query = searchQuery) => {
+    if (!query.trim() && Object.keys(activeFilters).length === 0) {
+      setSearchResults(null);
+      setSearchStats(null);
+      return;
+    }
+
+    setIsSearching(true);
+    
+    try {
+      const params = new URLSearchParams({
+        query: query.trim(),
+        filters: JSON.stringify(activeFilters),
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+        limit: '100'
+      });
+
+      const response = await fetch(`/api/admin/search?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setSearchResults(data.data);
+          setSearchStats(data.stats);
+          console.log('🔍 Search results:', data.data.length, 'influencers found');
+        }
+      } else {
+        console.error('❌ Search failed:', response.status);
+        setSearchResults([]);
+        setSearchStats(null);
+      }
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      setSearchResults([]);
+      setSearchStats(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleFilterChange = (filterKey, value) => {
+    const newFilters = { ...activeFilters };
+    
+    if (value === '' || value === null || value === undefined) {
+      delete newFilters[filterKey];
+    } else {
+      newFilters[filterKey] = value;
+    }
+    
+    setActiveFilters(newFilters);
+    
+    // Auto-search when filters change
+    setTimeout(() => handleSearch(), 100);
+  };
+
+  const clearFilters = () => {
+    setActiveFilters({});
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchStats(null);
+  };
+
+  const handleSort = (field) => {
+    const newOrder = sortBy === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortBy(field);
+    setSortOrder(newOrder);
+    
+    // Re-search with new sorting
+    setTimeout(() => handleSearch(), 100);
+  };
+
   if (!isAuthenticated || isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -271,6 +358,17 @@ export default function AdminDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                   Bulk
+                </button>
+                
+                <button
+                  onClick={() => router.push('/admin/invoices')}
+                  className="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium"
+                  title="Invoice Management"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Facturen
                 </button>
                 
                 {/* Divider */}
@@ -484,6 +582,265 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Search & Filter Section */}
+        <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700 mb-6">
+          <div className="p-6">
+            {/* Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Zoek influencers op naam, email, ref, social media..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    // Auto-search after 500ms delay
+                    clearTimeout(window.searchTimeout);
+                    window.searchTimeout = setTimeout(() => handleSearch(e.target.value), 500);
+                  }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  className="block w-full pl-10 pr-3 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {isSearching && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    showFilters || Object.keys(activeFilters).length > 0
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  Filters
+                  {Object.keys(activeFilters).length > 0 && (
+                    <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-2 py-1">
+                      {Object.keys(activeFilters).length}
+                    </span>
+                  )}
+                </button>
+                
+                <button
+                  onClick={handleSearch}
+                  disabled={isSearching}
+                  className="flex items-center px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Zoeken
+                </button>
+                
+                {(searchResults || Object.keys(activeFilters).length > 0) && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="border-t border-gray-700 pt-6">
+                <h3 className="text-sm font-medium text-white mb-4">Geavanceerde Filters</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Status</label>
+                    <select
+                      value={activeFilters.status?.[0] || ''}
+                      onChange={(e) => handleFilterChange('status', e.target.value ? [e.target.value] : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Alle statussen</option>
+                      <option value="active">Actief</option>
+                      <option value="inactive">Inactief</option>
+                      <option value="pending">In behandeling</option>
+                    </select>
+                  </div>
+
+                  {/* Commission Range */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Commissie Min %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="0.0"
+                      value={activeFilters.commissionMin || ''}
+                      onChange={(e) => handleFilterChange('commissionMin', e.target.value ? parseFloat(e.target.value) : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Commissie Max %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="20.0"
+                      value={activeFilters.commissionMax || ''}
+                      onChange={(e) => handleFilterChange('commissionMax', e.target.value ? parseFloat(e.target.value) : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Sales Range */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Min Verkopen</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={activeFilters.salesMin || ''}
+                      onChange={(e) => handleFilterChange('salesMin', e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Max Verkopen</label>
+                    <input
+                      type="number"
+                      placeholder="100"
+                      value={activeFilters.salesMax || ''}
+                      onChange={(e) => handleFilterChange('salesMax', e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Revenue Range */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Min Omzet €</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={activeFilters.revenueMin || ''}
+                      onChange={(e) => handleFilterChange('revenueMin', e.target.value ? parseFloat(e.target.value) : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Max Omzet €</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="10000.00"
+                      value={activeFilters.revenueMax || ''}
+                      onChange={(e) => handleFilterChange('revenueMax', e.target.value ? parseFloat(e.target.value) : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Performance Level */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2">Performance</label>
+                    <select
+                      value={activeFilters.performanceLevel?.[0] || ''}
+                      onChange={(e) => handleFilterChange('performanceLevel', e.target.value ? [e.target.value] : null)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Alle levels</option>
+                      <option value="none">Geen verkopen</option>
+                      <option value="low">Laag (1-2)</option>
+                      <option value="medium">Gemiddeld (3-5)</option>
+                      <option value="high">Hoog (6+)</option>
+                    </select>
+                  </div>
+                  
+                </div>
+
+                {/* Social Media Filters */}
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <h4 className="text-xs font-medium text-gray-400 mb-3">Social Media Platforms</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.hasInstagram || false}
+                        onChange={(e) => handleFilterChange('hasInstagram', e.target.checked || null)}
+                        className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 bg-gray-700"
+                      />
+                      <span className="ml-2 text-sm text-gray-300">Instagram</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.hasTiktok || false}
+                        onChange={(e) => handleFilterChange('hasTiktok', e.target.checked || null)}
+                        className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 bg-gray-700"
+                      />
+                      <span className="ml-2 text-sm text-gray-300">TikTok</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.hasYoutube || false}
+                        onChange={(e) => handleFilterChange('hasYoutube', e.target.checked || null)}
+                        className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 bg-gray-700"
+                      />
+                      <span className="ml-2 text-sm text-gray-300">YouTube</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={activeFilters.profileComplete || false}
+                        onChange={(e) => handleFilterChange('profileComplete', e.target.checked || null)}
+                        className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 bg-gray-700"
+                      />
+                      <span className="ml-2 text-sm text-gray-300">Compleet Profiel</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Search Stats */}
+            {searchStats && (
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-blue-400">{searchStats.totalResults}</p>
+                    <p className="text-xs text-gray-400">Resultaten</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-green-400">{formatCurrency(searchStats.totalRevenue)}</p>
+                    <p className="text-xs text-gray-400">Totale Omzet</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-purple-400">{formatCurrency(searchStats.totalCommission)}</p>
+                    <p className="text-xs text-gray-400">Totale Commissie</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-yellow-400">{searchStats.avgCommission.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-400">Gem. Commissie</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Influencers Table */}
         <div className="bg-gray-800 rounded-xl shadow-sm border border-gray-700">
           <div className="px-6 py-4 border-b border-gray-700">
@@ -510,26 +867,96 @@ export default function AdminDashboard() {
             <table className="min-w-full divide-y divide-gray-700">
               <thead className="bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Influencer
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Influencer
+                      {sortBy === 'name' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Email
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('email')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Email
+                      {sortBy === 'email' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Sales
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('totalSales')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Sales
+                      {sortBy === 'totalSales' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Revenue
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('totalRevenue')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Revenue
+                      {sortBy === 'totalRevenue' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Commission
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('commission')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Commission
+                      {sortBy === 'commission' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Status
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Status
+                      {sortBy === 'status' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Created
+                  <th className="px-6 py-3 text-left">
+                    <button
+                      onClick={() => handleSort('created_at')}
+                      className="flex items-center text-xs font-medium text-gray-300 uppercase tracking-wider hover:text-white transition-colors"
+                    >
+                      Created
+                      {sortBy === 'created_at' && (
+                        <svg className={`ml-1 h-3 w-3 ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                     Actions
@@ -537,84 +964,154 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {influencers.length > 0 ? influencers.map((influencer, index) => (
+                {/* Show search results if available, otherwise show regular influencers */}
+                {(searchResults || influencers).length > 0 ? (searchResults || influencers).map((influencer, index) => (
                   <tr key={index} className="hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 bg-gray-600 rounded-full flex items-center justify-center">
                           <span className="text-gray-200 font-medium text-sm">
-                            {influencer.name.charAt(0).toUpperCase()}
+                            {(influencer.name || influencer.ref || 'U').charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-white">{influencer.name}</div>
-                          <div className="text-sm text-gray-400">filright.com?ref={influencer.name}</div>
+                          <div className="text-sm font-medium text-white">{influencer.name || influencer.ref}</div>
+                          <div className="text-sm text-gray-400">filright.com?ref={influencer.ref || influencer.name}</div>
+                          {/* Performance indicator */}
+                          {influencer.performanceLevel && (
+                            <div className="flex items-center mt-1">
+                              <div className={`h-2 w-2 rounded-full mr-2 ${
+                                influencer.performanceLevel === 'high' ? 'bg-green-400' :
+                                influencer.performanceLevel === 'medium' ? 'bg-yellow-400' :
+                                influencer.performanceLevel === 'low' ? 'bg-orange-400' : 'bg-gray-400'
+                              }`}></div>
+                              <span className="text-xs text-gray-500 capitalize">{influencer.performanceLevel}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-200">{influencer.email}</div>
+                      <div className="text-sm text-gray-300">{influencer.email || 'Geen email'}</div>
+                      {influencer.phone && (
+                        <div className="text-sm text-gray-500">{influencer.phone}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-white">{influencer.totalSales || 0}</div>
-                      <div className="text-xs text-gray-400">orders</div>
+                      {influencer.lastSaleDate && (
+                        <div className="text-xs text-gray-500">Laatst: {influencer.lastSaleDate}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white">{formatCurrency(influencer.totalRevenue || 0)}</div>
+                      <div className="text-sm font-medium text-green-400">{formatCurrency(influencer.totalRevenue || 0)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-green-300">{formatCurrency(influencer.totalCommission || 0)}</div>
-                      <div className="text-xs text-gray-400">{influencer.commission}% rate</div>
+                      <div className="text-sm text-gray-300">
+                        {parseFloat(influencer.commission || 0).toFixed(1)}%
+                      </div>
+                      <div className="text-sm font-medium text-purple-400">
+                        {formatCurrency(influencer.totalCommission || 0)}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        influencer.status === 'active' 
-                          ? 'bg-green-900 text-green-200' 
-                          : 'bg-red-900 text-red-200'
+                        influencer.status === 'active' ? 'bg-green-900 text-green-200' :
+                        influencer.status === 'inactive' ? 'bg-red-900 text-red-200' :
+                        'bg-yellow-900 text-yellow-200'
                       }`}>
-                        {influencer.status}
+                        {influencer.status || 'active'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-400">
-                        {influencer.created_at ? new Date(influencer.created_at).toLocaleDateString('nl-NL') : 'Onbekend'}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                      {influencer.created_at ? new Date(influencer.created_at).toLocaleDateString('nl-NL') : 'Onbekend'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => handleEditUser(influencer)}
                         className="text-blue-400 hover:text-blue-300 mr-3"
                       >
-                        Edit
+                        Bewerken
                       </button>
+                      {/* Social Media Links */}
+                      <div className="flex space-x-2 mt-2">
+                        {influencer.instagram && (
+                          <a href={influencer.instagram} target="_blank" rel="noopener noreferrer" 
+                             className="text-pink-400 hover:text-pink-300" title="Instagram">
+                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                            </svg>
+                          </a>
+                        )}
+                        {influencer.tiktok && (
+                          <a href={influencer.tiktok} target="_blank" rel="noopener noreferrer" 
+                             className="text-gray-300 hover:text-white" title="TikTok">
+                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-.88-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/>
+                            </svg>
+                          </a>
+                        )}
+                        {influencer.youtube && (
+                          <a href={influencer.youtube} target="_blank" rel="noopener noreferrer" 
+                             className="text-red-400 hover:text-red-300" title="YouTube">
+                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="8" className="px-6 py-8 text-center">
+                    <td colSpan="8" className="px-6 py-12 text-center">
                       <div className="text-gray-400">
-                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <h3 className="mt-2 text-sm font-medium text-gray-300">Geen influencers gevonden</h3>
-                        <p className="mt-1 text-sm text-gray-400">Voeg je eerste influencer toe om te beginnen.</p>
-                        <div className="mt-6">
-                          <button
-                            onClick={() => router.push('/admin/users')}
-                            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                          >
-                            <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        {searchResults !== null ? (
+                          <div>
+                            <svg className="mx-auto h-12 w-12 text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
-                            Nieuwe Influencer
-                          </button>
-                        </div>
+                            <p className="text-lg font-medium text-gray-300 mb-2">Geen resultaten gevonden</p>
+                            <p className="text-sm">Probeer andere zoektermen of pas je filters aan</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <svg className="mx-auto h-12 w-12 text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <p className="text-lg font-medium text-gray-300 mb-2">Geen influencers gevonden</p>
+                            <p className="text-sm">Voeg je eerste influencer toe om te beginnen</p>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Results Summary */}
+          <div className="px-6 py-4 border-t border-gray-700 bg-gray-800">
+            <div className="flex justify-between items-center text-sm text-gray-400">
+              <div>
+                {searchResults ? (
+                  <span>Toont {searchResults.length} van {searchStats?.totalResults || 0} zoekresultaten</span>
+                ) : (
+                  <span>Toont {influencers.length} influencers</span>
+                )}
+              </div>
+              <div className="flex items-center space-x-4">
+                {searchResults && (
+                  <span className="text-green-400">
+                    Gefilterd: {formatCurrency(searchStats?.totalRevenue || 0)} omzet
+                  </span>
+                )}
+                <span className="text-blue-400">
+                  Laatst bijgewerkt: {new Date().toLocaleTimeString('nl-NL')}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </main>
