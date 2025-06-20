@@ -323,26 +323,6 @@ export default function BulkOperations() {
               >
                 Bulk Updates
               </button>
-              <button
-                onClick={() => setActiveTab('import')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'import'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                }`}
-              >
-                CSV Import
-              </button>
-              <button
-                onClick={() => setActiveTab('bulk')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'bulk'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-                }`}
-              >
-                Bulk Updates
-              </button>
             </nav>
           </div>
         </div>
