@@ -2,6 +2,8 @@
 
 ## Huidige Status
 - **✅ Admin Panel Werkt**: Gebruikt tijdelijk in-memory storage
+- **✅ Geavanceerd Zoeken**: Volledig geïmplementeerd
+- **✅ Factuur Systeem**: PDF generatie en BTW compliance
 - **⚠️ Database Niet Geconfigureerd**: PostgreSQL nog niet verbonden
 - **🔄 Klaar voor Upgrade**: Productie API's zijn al gemaakt
 
@@ -97,6 +99,126 @@ CREATE TABLE admin_users (
   role VARCHAR(20) DEFAULT 'admin',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP
+);
+```
+
+### invoices (Nieuw - Factuur Systeem)
+```sql
+CREATE TABLE invoices (
+  id SERIAL PRIMARY KEY,
+  invoice_number VARCHAR(20) UNIQUE NOT NULL,
+  influencer_ref VARCHAR(50) NOT NULL,
+  influencer_name VARCHAR(100) NOT NULL,
+  influencer_email VARCHAR(100) NOT NULL,
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  subtotal DECIMAL(10,2) NOT NULL,
+  btw_amount DECIMAL(10,2) NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL,
+  status VARCHAR(20) DEFAULT 'draft',
+  sent_date TIMESTAMP,
+  due_date DATE,
+  paid_date TIMESTAMP,
+  payment_reference VARCHAR(100),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### invoice_line_items (Nieuw - Factuur Regelitems)
+```sql
+CREATE TABLE invoice_line_items (
+  id SERIAL PRIMARY KEY,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  quantity INTEGER DEFAULT 1,
+  unit_price DECIMAL(10,2) NOT NULL,
+  total_price DECIMAL(10,2) NOT NULL,
+  commission_rate DECIMAL(5,2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### payment_reminders (Nieuw - Betalingsherinneringen)
+```sql
+CREATE TABLE payment_reminders (
+  id SERIAL PRIMARY KEY,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+  reminder_type VARCHAR(20) NOT NULL,
+  sent_date TIMESTAMP NOT NULL,
+  email_sent BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### invoice_settings (Nieuw - Factuur Instellingen)
+```sql
+CREATE TABLE invoice_settings (
+  id SERIAL PRIMARY KEY,
+  setting_key VARCHAR(50) UNIQUE NOT NULL,
+  setting_value TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### invoices (Nieuw - Factuur Systeem)
+```sql
+CREATE TABLE invoices (
+  id SERIAL PRIMARY KEY,
+  invoice_number VARCHAR(20) UNIQUE NOT NULL,
+  influencer_ref VARCHAR(50) NOT NULL,
+  influencer_name VARCHAR(100) NOT NULL,
+  influencer_email VARCHAR(100) NOT NULL,
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  subtotal DECIMAL(10,2) NOT NULL,
+  btw_amount DECIMAL(10,2) NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL,
+  status VARCHAR(20) DEFAULT 'draft',
+  sent_date TIMESTAMP,
+  due_date DATE,
+  paid_date TIMESTAMP,
+  payment_reference VARCHAR(100),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### invoice_line_items (Nieuw - Factuur Regelitems)
+```sql
+CREATE TABLE invoice_line_items (
+  id SERIAL PRIMARY KEY,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  quantity INTEGER DEFAULT 1,
+  unit_price DECIMAL(10,2) NOT NULL,
+  total_price DECIMAL(10,2) NOT NULL,
+  commission_rate DECIMAL(5,2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### payment_reminders (Nieuw - Betalingsherinneringen)
+```sql
+CREATE TABLE payment_reminders (
+  id SERIAL PRIMARY KEY,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+  reminder_type VARCHAR(20) NOT NULL,
+  sent_date TIMESTAMP NOT NULL,
+  email_sent BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### invoice_settings (Nieuw - Factuur Instellingen)
+```sql
+CREATE TABLE invoice_settings (
+  id SERIAL PRIMARY KEY,
+  setting_key VARCHAR(50) UNIQUE NOT NULL,
+  setting_value TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
