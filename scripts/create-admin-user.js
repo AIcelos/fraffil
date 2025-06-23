@@ -20,11 +20,11 @@ async function createSvenAdmin() {
       console.log('🔑 Temporary password: temp123456');
       console.log('');
       console.log('🔄 Next steps:');
-      console.log('1. Go to: https://fraffil.vercel.app/forgot-password');
+      console.log('1. Go to: https://affiliate.filright.com/forgot-password');
       console.log('2. Enter email: sven@filright.com');
       console.log('3. Check your email for reset link');
       console.log('4. Set your new password');
-      console.log('5. Login at: https://fraffil.vercel.app/admin/login');
+      console.log('5. Login at: https://affiliate.filright.com/admin/login');
     } else {
       console.error('❌ Failed to create admin user:', result.error);
     }

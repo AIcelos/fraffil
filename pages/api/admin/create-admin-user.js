@@ -43,11 +43,11 @@ export default async function handler(req, res) {
           created_at: result.data.created_at
         },
         instructions: {
-          step1: 'Go to: https://fraffil.vercel.app/forgot-password',
+          step1: 'Go to: https://affiliate.filright.com/forgot-password',
           step2: 'Enter email: sven@filright.com',
           step3: 'Check your email for reset link',
           step4: 'Set your new password',
-          step5: 'Login at: https://fraffil.vercel.app/admin/login'
+          step5: 'Login at: https://affiliate.filright.com/admin/login'
         }
       });
     } else {

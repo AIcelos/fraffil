@@ -10,6 +10,20 @@ export default function AdminDashboard() {
   const [adminUser, setAdminUser] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+    commission: 10.00,
+    notes: '',
+    ref: ''
+  });
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [inviteResult, setInviteResult] = useState(null);
   const router = useRouter();
 
   // Search & Filter state
@@ -208,81 +222,136 @@ export default function AdminDashboard() {
     setEditingUser(null);
   };
 
-  // Search functionality
+  const handleOpenInviteModal = () => {
+    setIsInviteModalOpen(true);
+    setInviteResult(null);
+    // Genereer een unieke ref code
+    const uniqueRef = 'inf_' + Math.random().toString(36).substr(2, 8);
+    setInviteForm(prev => ({ ...prev, ref: uniqueRef }));
+  };
+
+  const handleCloseInviteModal = () => {
+    setIsInviteModalOpen(false);
+    setInviteForm({
+      name: '',
+      email: '',
+      phone: '',
+      instagram: '',
+      tiktok: '',
+      youtube: '',
+      commission: 10.00,
+      notes: '',
+      ref: ''
+    });
+    setInviteResult(null);
+  };
+
+  const handleInviteFormChange = (e) => {
+    const { name, value } = e.target;
+    setInviteForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSendInvitation = async (e) => {
+    e.preventDefault();
+    setIsSendingInvite(true);
+    setInviteResult(null);
+
+    try {
+      const response = await fetch('/api/admin/send-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify(inviteForm)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setInviteResult({
+          type: 'success',
+          message: result.message,
+          credentials: result.credentials,
+          influencer: result.influencer
+        });
+        
+        // Refresh dashboard data to show new user
+        setTimeout(() => {
+          loadDashboardData();
+        }, 1000);
+      } else {
+        setInviteResult({
+          type: 'error',
+          message: result.error
+        });
+      }
+    } catch (error) {
+      console.error('❌ Send invitation error:', error);
+      setInviteResult({
+        type: 'error',
+        message: 'Failed to send invitation. Please try again.'
+      });
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
+
   const handleSearch = async (query = searchQuery) => {
-    if (!query.trim() && Object.keys(activeFilters).length === 0) {
+    if (!query.trim()) {
       setSearchResults(null);
       setSearchStats(null);
       return;
     }
 
     setIsSearching(true);
-    
     try {
-      const params = new URLSearchParams({
-        query: query.trim(),
-        filters: JSON.stringify(activeFilters),
-        sortBy: sortBy,
-        sortOrder: sortOrder,
-        limit: '100'
-      });
-
-      const response = await fetch(`/api/admin/search?${params}`, {
+      const response = await fetch('/api/admin/search', {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
+        },
+        body: JSON.stringify({ query })
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setSearchResults(data.data);
+          setSearchResults(data.results);
           setSearchStats(data.stats);
-          console.log('🔍 Search results:', data.data.length, 'influencers found');
         }
-      } else {
-        console.error('❌ Search failed:', response.status);
-        setSearchResults([]);
-        setSearchStats(null);
       }
     } catch (error) {
-      console.error('❌ Search error:', error);
-      setSearchResults([]);
-      setSearchStats(null);
+      console.error('Search error:', error);
     } finally {
       setIsSearching(false);
     }
   };
 
   const handleFilterChange = (filterKey, value) => {
-    const newFilters = { ...activeFilters };
-    
-    if (value === '' || value === null || value === undefined) {
-      delete newFilters[filterKey];
-    } else {
-      newFilters[filterKey] = value;
-    }
-    
-    setActiveFilters(newFilters);
-    
-    // Auto-search when filters change
-    setTimeout(() => handleSearch(), 100);
+    setActiveFilters(prev => ({
+      ...prev,
+      [filterKey]: value
+    }));
   };
 
   const clearFilters = () => {
     setActiveFilters({});
-    setSearchQuery('');
     setSearchResults(null);
     setSearchStats(null);
   };
 
   const handleSort = (field) => {
-    const newOrder = sortBy === field && sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortBy(field);
-    setSortOrder(newOrder);
-    
-    // Re-search with new sorting
-    setTimeout(() => handleSearch(), 100);
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
   };
 
   if (!isAuthenticated || isLoading) {
@@ -441,6 +510,17 @@ export default function AdminDashboard() {
               </button>
               
               <button
+                onClick={handleOpenInviteModal}
+                className="flex items-center px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="hidden sm:inline">Uitnodiging Sturen</span>
+                <span className="sm:hidden">Uitnodigen</span>
+              </button>
+              
+              <button
                 onClick={() => router.push('/admin/email-tester')}
                 className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
@@ -449,6 +529,17 @@ export default function AdminDashboard() {
                 </svg>
                 <span className="hidden sm:inline">Email Test</span>
                 <span className="sm:hidden">Email</span>
+              </button>
+              
+              <button
+                onClick={() => router.push('/admin/email-templates')}
+                className="flex items-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="hidden sm:inline">Template Editor</span>
+                <span className="sm:hidden">Templates</span>
               </button>
             </div>
             
@@ -1140,6 +1231,17 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Invitation Modal */}
+      <InvitationModal
+        isOpen={isInviteModalOpen}
+        onClose={handleCloseInviteModal}
+        formData={inviteForm}
+        onChange={handleInviteFormChange}
+        onSubmit={handleSendInvitation}
+        isSending={isSendingInvite}
+        result={inviteResult}
+      />
     </div>
   );
 }
@@ -1338,5 +1440,242 @@ const EditUserForm = ({ user, onSave, onCancel }) => {
         </button>
       </div>
     </form>
+  );
+};
+
+// Invitation Modal Component
+const InvitationModal = ({ isOpen, onClose, formData, onChange, onSubmit, isSending, result }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-white">Uitnodiging Sturen</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-gray-400 mt-2">
+            Stuur een uitnodiging naar een nieuwe influencer met automatische account aanmaak en email.
+          </p>
+        </div>
+
+        <form onSubmit={onSubmit} className="p-6 space-y-6">
+          {/* Result Message */}
+          {result && (
+            <div className={`p-4 rounded-lg border ${
+              result.type === 'success' 
+                ? 'bg-green-900/20 border-green-800 text-green-300' 
+                : 'bg-red-900/20 border-red-800 text-red-300'
+            }`}>
+              <div className="flex items-center">
+                {result.type === 'success' ? (
+                  <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                <span className="font-medium">{result.message}</span>
+              </div>
+              
+              {result.type === 'success' && result.credentials && (
+                <div className="mt-3 p-3 bg-gray-700 rounded-lg">
+                  <p className="text-sm text-gray-300 mb-2">Account gegevens:</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-400">Username:</span>
+                      <span className="ml-2 text-white font-mono">{result.credentials.username}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Password:</span>
+                      <span className="ml-2 text-white font-mono">{result.credentials.password}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Naam *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={onChange}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Email *
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={onChange}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Referral Code *
+              </label>
+              <input
+                type="text"
+                name="ref"
+                value={formData.ref}
+                onChange={onChange}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                required
+                readOnly
+              />
+              <p className="text-xs text-gray-400 mt-1">Automatisch gegenereerd</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Commission (%)
+              </label>
+              <input
+                type="number"
+                name="commission"
+                value={formData.commission}
+                onChange={onChange}
+                step="0.01"
+                min="0"
+                max="100"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Telefoon
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={onChange}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Instagram
+              </label>
+              <input
+                type="text"
+                name="instagram"
+                value={formData.instagram}
+                onChange={onChange}
+                placeholder="@username"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                TikTok
+              </label>
+              <input
+                type="text"
+                name="tiktok"
+                value={formData.tiktok}
+                onChange={onChange}
+                placeholder="@username"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                YouTube
+              </label>
+              <input
+                type="text"
+                name="youtube"
+                value={formData.youtube}
+                onChange={onChange}
+                placeholder="@channel"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Notities
+            </label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={onChange}
+              rows="3"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Extra informatie over deze influencer..."
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              disabled={isSending}
+            >
+              Annuleren
+            </button>
+            <button
+              type="submit"
+              disabled={isSending}
+              className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              {isSending ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Uitnodiging versturen...
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Uitnodiging Sturen
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }; 

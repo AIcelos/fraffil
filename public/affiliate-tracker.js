@@ -3,7 +3,7 @@
 
 class AffiliateTracker {
   constructor() {
-    this.apiUrl = 'https://fraffil.vercel.app/api/affiliate';
+    this.apiUrl = 'https://affiliate.filright.com/api/affiliate';
     this.retryAttempts = 3;
     this.retryDelay = 1000; // 1 seconde
   }

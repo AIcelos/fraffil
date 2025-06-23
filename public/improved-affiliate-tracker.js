@@ -106,7 +106,7 @@
         payload.amount = orderAmount;
       }
       
-      fetch('https://fraffil.vercel.app/api/affiliate', {
+      fetch('https://affiliate.filright.com/api/affiliate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

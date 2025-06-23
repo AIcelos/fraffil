@@ -3,7 +3,7 @@ console.log('🔧 Affiliate Debug Script gestart');
 
 class AffiliateDebugger {
   constructor() {
-    this.baseUrl = 'https://fraffil.vercel.app';
+    this.baseUrl = 'https://affiliate.filright.com';
     this.testResults = {};
   }
 

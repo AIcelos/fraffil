@@ -172,7 +172,7 @@ export default async function handler(req, res) {
           warning: 'Email kon niet worden verzonden',
           emailError: emailResult.error,
           debug: {
-            resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
+            resetUrl: `https://affiliate.filright.com/reset-password?token=${resetToken}`,
             email: user.email,
             tokenId: tokenSaveResult.id,
             note: 'Token opgeslagen - email verzending gefaald'
@@ -189,7 +189,7 @@ export default async function handler(req, res) {
         emailSent: true,
         emailId: emailResult.messageId,
         debug: {
-          resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
+          resetUrl: `https://affiliate.filright.com/reset-password?token=${resetToken}`,
           email: user.email,
           tokenId: tokenSaveResult.id,
           note: 'Email succesvol verzonden via Resend'
@@ -206,7 +206,7 @@ export default async function handler(req, res) {
         warning: 'Email service tijdelijk niet beschikbaar',
         emailError: emailError.message,
         debug: {
-          resetUrl: `https://fraffil.vercel.app/reset-password?token=${resetToken}`,
+          resetUrl: `https://affiliate.filright.com/reset-password?token=${resetToken}`,
           email: user.email,
           tokenId: tokenSaveResult.id,
           note: 'Token opgeslagen - email service error'

@@ -3,90 +3,102 @@ import { emailService } from '../../../lib/email.js';
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Simple admin authentication
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      success: false,
-      error: 'Geen geldige authenticatie'
-    });
-  }
-
   try {
-    console.log('🧪 Testing email configuration...');
-    
-    // Check environment variables
-    const hasApiKey = !!process.env.RESEND_API_KEY;
-    const apiKeyLength = process.env.RESEND_API_KEY ? process.env.RESEND_API_KEY.length : 0;
-    const nodeEnv = process.env.NODE_ENV;
-    
-    console.log('Environment check:');
-    console.log('  - RESEND_API_KEY exists:', hasApiKey);
-    console.log('  - API key length:', apiKeyLength);
-    console.log('  - NODE_ENV:', nodeEnv);
+    const { template, testData } = req.body;
 
-    if (!hasApiKey) {
-      return res.status(200).json({
+    console.log('📧 Testing email template:', template, testData);
+
+    // Validatie
+    if (!template) {
+      return res.status(400).json({
         success: false,
-        error: 'RESEND_API_KEY not configured',
-        config: {
-          hasApiKey: false,
-          apiKeyLength: 0,
-          nodeEnv: nodeEnv,
-          note: 'Email functionality will not work without API key'
-        }
+        error: 'Template type is required'
       });
     }
 
-    // Test basic email service availability
-    try {
-      // Don't actually send an email, just test the service initialization
-      console.log('✅ Email service configuration looks good');
-      
-      res.status(200).json({
-        success: true,
-        message: 'Email service is properly configured',
-        config: {
-          hasApiKey: true,
-          apiKeyLength: apiKeyLength,
-          nodeEnv: nodeEnv,
-          note: 'Ready to send emails via Resend'
-        }
-      });
+    // Test email versturen op basis van template type
+    let emailResult;
+    
+    switch (template) {
+      case 'welcome':
+        emailResult = await emailService.sendWelcomeEmail(
+          testData.email || 'test@example.com',
+          testData.name || 'Test Gebruiker',
+          testData.username || 'testuser123',
+          testData.password || 'testpass123',
+          testData.loginUrl || 'https://affiliate.filright.com/dashboard/login'
+        );
+        break;
+        
+      case 'sale':
+        emailResult = await emailService.sendSaleNotification(
+          testData.email || 'test@example.com',
+          testData.name || 'Test Gebruiker',
+          testData.orderId || 'ORD-2024-001',
+          testData.amount || 149.99,
+          testData.commission || 14.99,
+          testData.totalEarnings || 234.56
+        );
+        break;
+        
+      case 'weekly':
+        emailResult = await emailService.sendWeeklyReport(
+          testData.email || 'test@example.com',
+          testData.name || 'Test Gebruiker',
+          testData.weekNumber || 25,
+          testData.totalSales || 1247.89,
+          testData.totalCommission || 124.79,
+          testData.topProducts || ['Product A', 'Product B', 'Product C']
+        );
+        break;
+        
+      case 'passwordReset':
+        emailResult = await emailService.sendPasswordResetEmail(
+          testData.email || 'test@example.com',
+          testData.name || 'Test Gebruiker',
+          testData.resetUrl || 'https://affiliate.filright.com/reset-password?token=test123',
+          testData.expiryTime || '1 uur'
+        );
+        break;
+        
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Unknown template type'
+        });
+    }
 
-    } catch (emailError) {
-      console.error('❌ Email service error:', emailError);
-      
-      res.status(200).json({
+    if (emailResult.success) {
+      return res.status(200).json({
+        success: true,
+        message: `Test email verstuurd voor ${template} template`,
+        template,
+        testData
+      });
+    } else {
+      return res.status(500).json({
         success: false,
-        error: 'Email service configuration error',
-        details: emailError.message,
-        config: {
-          hasApiKey: true,
-          apiKeyLength: apiKeyLength,
-          nodeEnv: nodeEnv
-        }
+        error: emailResult.error || 'Failed to send test email'
       });
     }
 
   } catch (error) {
-    console.error('❌ Test error:', error);
-    
-    res.status(500).json({
+    console.error('❌ Error testing email template:', error);
+    return res.status(500).json({
       success: false,
-      error: 'Test failed: ' + error.message,
-      stack: error.stack
+      error: 'Internal server error: ' + error.message
     });
   }
 } 
