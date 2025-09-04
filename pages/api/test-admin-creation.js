@@ -36,11 +36,11 @@ export default async function handler(req, res) {
         error: result.error || null,
         data: result.data || null,
         nextSteps: result.success ? [
-          'Go to: https://fraffil.vercel.app/forgot-password',
+          'Go to: https://affiliate.filright.com/forgot-password',
           'Enter email: sven@filright.com',
           'Check your email for reset link',
           'Set your new password',
-          'Login at: https://fraffil.vercel.app/admin/login'
+          'Login at: https://affiliate.filright.com/admin/login'
         ] : null
       });
     } else {

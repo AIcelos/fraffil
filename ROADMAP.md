@@ -257,7 +257,7 @@ Vercel Serverless
 ## **🚀 DEPLOYMENT STATUS**
 
 ### **Production Environment**:
-- **URL**: https://fraffil.vercel.app
+- **URL**: https://affiliate.filright.com
 - **Admin Panel**: /admin/dashboard
 - **Invoice System**: /admin/invoices
 - **Email Testing**: /admin/email-tester

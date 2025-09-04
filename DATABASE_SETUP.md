@@ -226,7 +226,7 @@ CREATE TABLE invoice_settings (
 
 ### Test API:
 ```bash
-curl https://fraffil.vercel.app/api/admin/test-db
+curl https://affiliate.filright.com/api/admin/test-db
 ```
 
 ### Expected Response (Working):

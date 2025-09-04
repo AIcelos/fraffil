@@ -1,7 +1,7 @@
 # 📜 FILRIGHT AFFILIATE DASHBOARD - PROJECT HISTORY
 
 ## 🎯 PROJECT OVERVIEW
-**Live URL:** https://fraffil.vercel.app  
+**Live URL:** https://affiliate.filright.com  
 **Status:** ✅ Production Ready - Advanced Search & Invoice Systems Live  
 **Last Updated:** 20 December 2024
 

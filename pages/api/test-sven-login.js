@@ -40,7 +40,7 @@ export default async function handler(req, res) {
         },
         token: token,
         instructions: [
-          '1. Go to: https://fraffil.vercel.app/admin/login',
+          '1. Go to: https://affiliate.filright.com/admin/login',
           '2. Username: sven',
           '3. Password: sven_admin_2025',
           '4. Click Login'
