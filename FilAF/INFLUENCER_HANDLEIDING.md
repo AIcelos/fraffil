@@ -5,11 +5,11 @@ Deze handleiding legt uit hoe je als influencer met het Filright Affiliate Dashb
 ---
 
 ## 🔑 Inloggen
-- Dashboard: `https://fraffil.vercel.app/dashboard`
-- Inloggen: `https://fraffil.vercel.app/dashboard/login`
+- Dashboard: `https://affiliate.filright.com/dashboard`
+- Inloggen: `https://affiliate.filright.com/dashboard/login`
 - Gebruikersnaam: jouw toegewezen username (bijv. `finaltest`)
-- Wachtwoord vergeten: `https://fraffil.vercel.app/forgot-password`
-  - Volg de stappen in de e-mail. Resetpagina: `https://fraffil.vercel.app/reset-password`
+- Wachtwoord vergeten: `https://affiliate.filright.com/forgot-password`
+  - Volg de stappen in de e-mail. Resetpagina: `https://affiliate.filright.com/reset-password`
 
 Tips:
 - Gebruik een moderne browser (Chrome, Edge, Safari, Firefox)
@@ -33,7 +33,7 @@ Aanbevelingen:
 ## 📊 Dashboard-overzicht
 Na inloggen zie je:
 - Omzet (Revenue): totaalbedrag van aan jou toegekende bestellingen
-- Commissie (Commission): jouw percentage van de omzet (bijv. 12,5%)
+- Commissie (Commission): jouw percentage van de omzet
 - Bestellingen (Orders): aantal orders via jouw link
 - Recente bestellingen: meest recente orders met bedrag
 
@@ -47,9 +47,6 @@ Verversing van data:
 - Formule: `totale_commissie = totale_omzet × (commissiepercentage / 100)`
 - Voorbeeld: bij €6.538,94 omzet en 12,5% commissie = €817,37
 - Je persoonlijke percentage staat ingesteld in het systeem
-
-Verschillen met Google Sheet?
-- Brondata is dezelfde. Wacht 1–2 minuten en refresh. Blijft er verschil? Zie Support.
 
 ---
 
@@ -65,14 +62,14 @@ Verschillen met Google Sheet?
 ## 🧪 Troubleshooting
 - Ik zie geen data:
   - Controleer `?ref=<username>` in de link
-  - Wacht 1–2 minuten en refresh `https://fraffil.vercel.app/dashboard`
-  - Zet adblockers uit voor `filright.com` en `fraffil.vercel.app`
+  - Wacht 1–2 minuten en refresh `https://affiliate.filright.com/dashboard`
+  - Zet adblockers uit voor `filright.com` en `affiliate.filright.com`
 - Mijn commissie klopt niet:
   - Verifieer je ingestelde percentage bij je contactpersoon
   - Meld ontbrekende/fout toegewezen orders via Support
 - Wachtwoord reset werkt niet:
   - Check je spamfolder
-  - Vraag een nieuwe reset aan via `https://fraffil.vercel.app/forgot-password`
+  - Vraag een nieuwe reset aan via `https://affiliate.filright.com/forgot-password`
 - Ik kan niet inloggen:
   - Check hoofd-/kleine letters in username/wachtwoord
   - Probeer een privé/incognito venster
