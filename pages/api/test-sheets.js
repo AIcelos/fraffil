@@ -92,6 +92,54 @@ export default async function handler(req, res) {
     console.log('🧮 Testing stats calculation for finaltest...');
     const testStats = await googleSheetsService.getInfluencerStats('finaltest');
 
+    // Check for new references if requested
+    let newReferences = null;
+    if (req.query.newReferences === 'true') {
+      try {
+        // Get registered influencers from database
+        const { sql } = await import('@vercel/postgres');
+        const result = await sql`
+          SELECT username, ref, name, email, status, created_at
+          FROM influencers 
+          WHERE status = 'active'
+          ORDER BY created_at DESC
+        `;
+        
+        const registeredInfluencers = result.rows || [];
+        const registeredRefs = new Set();
+        const registeredUsernames = new Set();
+        
+        registeredInfluencers.forEach(inf => {
+          if (inf.ref) registeredRefs.add(inf.ref.toLowerCase());
+          if (inf.username) registeredUsernames.add(inf.username.toLowerCase());
+        });
+
+        // Find new references (not registered)
+        const allRefs = [...new Set(sampleData.map(row => row.ref).filter(Boolean))];
+        const newRefs = allRefs.filter(ref => 
+          !registeredRefs.has(ref.toLowerCase()) && 
+          !registeredUsernames.has(ref.toLowerCase())
+        );
+
+        // Get stats for new references
+        newReferences = newRefs.map(ref => {
+          const refData = sampleData.filter(row => row.ref === ref);
+          const totalRevenue = refData.reduce((sum, row) => sum + (row.amount || 0), 0);
+          return {
+            ref: ref,
+            totalSales: refData.length,
+            totalRevenue: totalRevenue,
+            firstSale: refData[0]?.date,
+            lastSale: refData[refData.length - 1]?.date
+          };
+        }).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      } catch (error) {
+        console.error('❌ Error getting new references:', error);
+        newReferences = [];
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Google Sheets connection successful!',
@@ -100,7 +148,8 @@ export default async function handler(req, res) {
         totalRows: sampleData.length,
         sampleData: sampleData.slice(0, 5), // First 5 rows
         uniqueInfluencers,
-        testStats
+        testStats,
+        newReferences: newReferences
       },
       environment: {
         hasSpreadsheetId: !!process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
