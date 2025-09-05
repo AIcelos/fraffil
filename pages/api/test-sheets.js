@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       hasSpreadsheetId: !!process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
       hasClientEmail: !!process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.GOOGLE_SHEETS_PRIVATE_KEY,
+      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID, // Show the actual ID
     };
     console.log('📋 Environment check:', env);
 
@@ -100,6 +101,15 @@ export default async function handler(req, res) {
         sampleData: sampleData.slice(0, 5), // First 5 rows
         uniqueInfluencers,
         testStats
+      },
+      environment: {
+        hasSpreadsheetId: !!process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+        hasClientEmail: !!process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+        hasPrivateKey: !!process.env.GOOGLE_SHEETS_PRIVATE_KEY,
+        spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+        googleSheetsUrl: process.env.GOOGLE_SHEETS_SPREADSHEET_ID ? 
+          `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEETS_SPREADSHEET_ID}/edit` : 
+          'Not configured'
       },
       upgradeInfo: {
         message: 'To upgrade headers, call this endpoint with ?upgradeHeaders=true',
