@@ -419,6 +419,16 @@ export default function AdminDashboard() {
                   Email
                 </button>
                 <button
+                  onClick={() => router.push('/admin/new-references')}
+                  className="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium"
+                  title="Nieuwe Referenties"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Nieuwe Refs
+                </button>
+                <button
                   onClick={() => router.push('/admin/bulk-operations')}
                   className="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors text-sm font-medium"
                   title="Bulk Operations"
