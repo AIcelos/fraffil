@@ -94,8 +94,11 @@ export default async function handler(req, res) {
 
     // Check for new references if requested
     let newReferences = null;
+    console.log('🔍 Checking for new references, query param:', req.query.newReferences);
+    
     if (req.query.newReferences === 'true') {
       try {
+        console.log('📊 Getting registered influencers from database...');
         // Get registered influencers from database
         const { sql } = await import('@vercel/postgres');
         const result = await sql`
@@ -106,6 +109,8 @@ export default async function handler(req, res) {
         `;
         
         const registeredInfluencers = result.rows || [];
+        console.log('👥 Found registered influencers:', registeredInfluencers.length);
+        
         const registeredRefs = new Set();
         const registeredUsernames = new Set();
         
@@ -116,10 +121,13 @@ export default async function handler(req, res) {
 
         // Find new references (not registered)
         const allRefs = [...new Set(sampleData.map(row => row.ref).filter(Boolean))];
+        console.log('📋 All refs from sheets:', allRefs);
+        
         const newRefs = allRefs.filter(ref => 
           !registeredRefs.has(ref.toLowerCase()) && 
           !registeredUsernames.has(ref.toLowerCase())
         );
+        console.log('🆕 New refs found:', newRefs);
 
         // Get stats for new references
         newReferences = newRefs.map(ref => {
@@ -134,10 +142,14 @@ export default async function handler(req, res) {
           };
         }).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
+        console.log('📊 New references processed:', newReferences);
+
       } catch (error) {
         console.error('❌ Error getting new references:', error);
-        newReferences = [];
+        newReferences = { error: error.message };
       }
+    } else {
+      console.log('ℹ️ New references not requested');
     }
 
     return res.status(200).json({
